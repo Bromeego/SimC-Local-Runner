@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-07-17
+
 ### Added
 
 - Drag-and-drop `.simc` and `.txt` profile uploads.
@@ -18,9 +20,23 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   resolved digest, SimulationCraft version, settings, and run duration.
 - Automated unit, Compose, container-build, and SimulationCraft smoke checks.
 - Docker image publishing workflow for GitHub Container Registry.
+- A compact SimulationCraft favicon matching the web interface.
+
+### Changed
+
+- The default Compose deployment now pulls the published GHCR image, with a
+  separate override available for local builds.
+
+### Fixed
+
+- Reset the transient simulation progress state when returning to the runner
+  with the browser Back button.
 
 ### Security
 
 - Escaped process error output before rendering it in the browser.
 - Unique per-run filenames and container names.
 - Documented the Docker socket trust boundary.
+
+[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Bromeego/SimC-Local-Runner/releases/tag/v0.1.0

@@ -1,7 +1,6 @@
 services:
   simc-web:
-    image: "${SIMC_WEB_IMAGE:-simc-web:local}"
-    build: ./app
+    image: "${SIMC_WEB_IMAGE:-ghcr.io/bromeego/simc-local-runner:latest}"
     container_name: simc-web
     ports:
       - "${SIMC_WEB_PORT:-8088}:8080"

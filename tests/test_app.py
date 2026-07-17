@@ -47,6 +47,15 @@ class SimcWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"status": "ok"})
 
+    def test_favicon_is_served(self):
+        response = self.client.get("/static/favicon.svg")
+        try:
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, "image/svg+xml")
+            self.assertIn(b">SC</text>", response.data)
+        finally:
+            response.close()
+
     def test_index_renders_empty_and_loading_states(self):
         response = self.client.get("/")
         page = response.get_data(as_text=True)
@@ -55,6 +64,7 @@ class SimcWebTests(unittest.TestCase):
         self.assertIn("Simulation running", page)
         self.assertIn("Drop a .simc file here", page)
         self.assertIn("raid-single-target", page)
+        self.assertIn('rel="icon" href="/static/favicon.svg"', page)
         self.assertNotIn("—", page)
         self.assertNotIn("–", page)
 
