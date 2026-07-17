@@ -38,6 +38,8 @@ jobs:
         run: |
           docker compose config --quiet
           docker compose -f compose.yaml -f compose.build.yaml config --quiet
+          docker compose -f compose.yaml -f compose.bind.yaml config --quiet
+          docker compose -f compose.yaml -f compose.bind.yaml -f compose.build.yaml config --quiet
 
       - name: Build web image
         run: docker build -t simc-web:test app

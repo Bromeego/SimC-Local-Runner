@@ -45,50 +45,38 @@ report that is easy to understand and maintain.
 
 ## Requirements
 
-- A Linux host with Docker Engine and Docker Compose
-- Permission to access the Docker socket
-- An absolute host path for the deployment and its saved data
+- Docker Desktop on Windows or macOS, or Docker Engine with Compose on Linux
+- Linux container support and permission to access the Docker socket
+- An x86-64 computer for native SimulationCraft performance
 
 The app runs a second container for each simulation. It therefore mounts the
-host Docker socket and needs the host's absolute paths to the `input` and
-`output` directories.
+host Docker socket. Keep it on a trusted personal computer or homelab network.
+Apple silicon can run the current x86-64 SimulationCraft image through Docker
+emulation, but simulations may be slower.
 
 ## Quick start
 
-1. Clone the repository and enter its directory:
+1. Open the [latest release](https://github.com/Bromeego/SimC-Local-Runner/releases/latest),
+   download **Source code (zip)**, and extract it to a permanent folder.
 
-   ```sh
-   git clone https://github.com/Bromeego/SimC-Local-Runner.git
-   cd SimC-Local-Runner
-   ```
+2. Start the runner:
 
-2. Create the data directories:
+   - Windows: double-click `start.cmd`.
+   - macOS: open Terminal in the folder and run `sh start.sh`.
+   - Linux: run `sh start.sh`.
 
-   ```sh
-   mkdir -p input output
-   ```
+3. Open <http://localhost:8088>.
 
-3. Copy the example configuration:
+The launcher checks Docker, pulls the current image, and starts the app. No
+`.env` file or storage path is required. For a manual start, use:
 
-   ```sh
-   cp .env.example .env
-   ```
+```sh
+docker compose pull simc-web
+docker compose up -d
+```
 
-4. Edit `.env` and set `SIMC_WEB_ROOT` to the absolute path of this directory
-   on the Docker host. For example:
-
-   ```dotenv
-   SIMC_WEB_ROOT=/srv/simc-web
-   ```
-
-5. Pull the published image and start the app:
-
-   ```sh
-   docker compose pull
-   docker compose up -d
-   ```
-
-6. Open `http://HOSTNAME-OR-IP:8088`.
+See the [setup guide](docs/SETUP.md) for homelab bind folders, updates,
+platform notes, and troubleshooting.
 
 View logs with:
 
@@ -104,9 +92,9 @@ docker compose down
 
 ### Building locally
 
-The default Compose file uses the published `linux/amd64` or `linux/arm64`
-image from GitHub Container Registry. To build the web app from this checkout
-instead, add the local-build override:
+The default Compose file uses the published image from GitHub Container
+Registry. To build the web app from this checkout instead, add the local-build
+override:
 
 ```sh
 docker compose -f compose.yaml -f compose.build.yaml up -d --build
@@ -122,7 +110,6 @@ The example values live in [`.env.example`](.env.example).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `SIMC_WEB_ROOT` | Required | Absolute host path to the deployment directory |
 | `SIMC_WEB_PORT` | `8088` | Port exposed by the web app |
 | `SIMC_WEB_IMAGE` | `ghcr.io/bromeego/simc-local-runner:latest` | Web interface image used by Compose |
 | `TZ` | `UTC` | Container timezone, using an IANA timezone name |
@@ -136,8 +123,9 @@ The example values live in [`.env.example`](.env.example).
 | `REPORT_RETENTION_COUNT` | `100` | Reports retained after a successful run |
 | `WEB_THREADS` | `4` | Web threads for pages and long-running requests |
 
-`SIMC_WEB_ROOT` must be a host path, not a path inside the web container. The
-web app passes it to the Docker daemon when launching SimulationCraft.
+The default deployment stores profiles and reports in Docker-managed volumes.
+The optional homelab bind-folder mode uses `SIMC_WEB_ROOT`; see the
+[setup guide](docs/SETUP.md).
 
 Before every simulation, the default `always` pull policy asks Docker for the
 current `SIMC_IMAGE`. Docker reuses existing image layers when the registry copy
@@ -159,9 +147,10 @@ The values chosen in the web interface replace any existing `fight_style`,
 profile. DungeonSlice uses its own target flow and timing, so `desired_targets`
 and `max_time` are not added for that fight style.
 
-Generated inputs are stored in `input/`, and generated reports are stored in
-`output/`. These directories are excluded from Git because profiles and reports
-can contain character information and can grow over time.
+Generated inputs and reports are stored in persistent Docker volumes by
+default. The homelab bind-folder mode stores them in `input/` and `output/`
+under `SIMC_WEB_ROOT`. Profiles and reports can contain character information
+and can grow over time.
 
 Each successful report also gets a matching `.json` metadata file in `output/`.
 It records the exact SimulationCraft image digest when Docker exposes one, the
@@ -179,17 +168,16 @@ the configured retention count is exceeded.
 
 ## Updating
 
-Pull the latest project and container changes:
+Run `start.cmd` or `start.sh` again, or update manually:
 
 ```sh
-git pull
 docker compose pull simc-web
 docker compose up -d
 ```
 
 The runner refreshes the configured SimulationCraft engine automatically when
-the next simulation starts. Existing inputs and reports remain in their
-bind-mounted directories.
+the next simulation starts. Existing Docker volumes or homelab folders remain
+in place.
 
 For a local build, use the two-file command from the Building locally section
 after pulling the latest project changes.
@@ -208,6 +196,7 @@ after pulling the latest project changes.
 |-- input/                 # Submitted profiles (generated, not committed)
 |-- output/                # HTML reports (generated, not committed)
 |-- docs/screenshots/      # README previews
+|-- docs/SETUP.md          # Personal computer and homelab setup
 |-- examples/demo.simc     # Anonymous profile for smoke testing
 |-- tests/
 |-- .github/               # Checks, image publishing, and issue templates
@@ -216,7 +205,10 @@ after pulling the latest project changes.
 |-- LICENSE
 |-- SECURITY.md
 |-- .env.example
+|-- compose.bind.yaml      # Optional homelab bind-folder storage
 |-- compose.build.yaml     # Local source-build override
+|-- start.cmd              # Windows launcher
+|-- start.sh               # macOS and Linux launcher
 `-- compose.yaml           # Published-image deployment
 ```
 
@@ -229,9 +221,9 @@ running and that the socket is mounted as shown in `compose.yaml`.
 
 ### Simulation starts but no report appears
 
-Check the app logs and verify that `SIMC_WEB_ROOT` exactly matches the absolute
-deployment path on the Docker host. The `input/` and `output/` directories must
-also be writable.
+Check the app logs for a Docker storage error. The web container must have
+`/data/input`, `/data/output`, and `/var/run/docker.sock` mounted. In homelab
+bind-folder mode, also confirm `SIMC_WEB_ROOT` exists and is writable.
 
 ### SimulationCraft image cannot be pulled
 
@@ -256,19 +248,20 @@ network access, and keep Docker and the images up to date.
 Install the app requirements, then run the standard-library test suite:
 
 ```sh
-python -m pip install -r app/requirements.txt
-python -m unittest discover -s tests -v
+.venv/bin/python -m pip install -r app/requirements.txt
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Validate the deployment and build the web image with:
 
 ```sh
-SIMC_WEB_ROOT=/tmp/simc-web docker compose config --quiet
-SIMC_WEB_ROOT=/tmp/simc-web docker compose -f compose.yaml -f compose.build.yaml config --quiet
+docker compose config --quiet
+docker compose -f compose.yaml -f compose.build.yaml config --quiet
+SIMC_WEB_ROOT=/tmp/simc-web docker compose -f compose.yaml -f compose.bind.yaml config --quiet
 docker build -t simc-web:test app
 ```
 
-On a Linux Docker host, run the real engine smoke test with:
+Run the real engine smoke test with:
 
 ```sh
 sh tests/smoke-test.sh

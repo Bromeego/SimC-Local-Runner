@@ -1,3 +1,5 @@
+name: simc-local-runner
+
 services:
   simc-web:
     image: "${SIMC_WEB_IMAGE:-ghcr.io/bromeego/simc-local-runner:latest}"
@@ -10,15 +12,17 @@ services:
       SIMC_PULL_POLICY: "${SIMC_PULL_POLICY:-always}"
       SIMC_CPUS: "${SIMC_CPUS:-}"
       SIMC_MEMORY: "${SIMC_MEMORY:-}"
-      HOST_INPUT_DIR: "${SIMC_WEB_ROOT:?Set SIMC_WEB_ROOT in .env}/input"
-      HOST_OUTPUT_DIR: "${SIMC_WEB_ROOT:?Set SIMC_WEB_ROOT in .env}/output"
       SIMC_TIMEOUT_SECONDS: "${SIMC_TIMEOUT_SECONDS:-1800}"
       MAX_UPLOAD_MB: "${MAX_UPLOAD_MB:-2}"
       MAX_CONCURRENT_SIMS: "${MAX_CONCURRENT_SIMS:-1}"
       REPORT_RETENTION_COUNT: "${REPORT_RETENTION_COUNT:-100}"
       WEB_THREADS: "${WEB_THREADS:-4}"
     volumes:
-      - ./input:/data/input
-      - ./output:/data/output
+      - simc-input:/data/input
+      - simc-output:/data/output
       - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
+
+volumes:
+  simc-input:
+  simc-output:

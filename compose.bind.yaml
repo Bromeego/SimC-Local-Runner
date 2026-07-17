@@ -1,0 +1,9 @@
+services:
+  simc-web:
+    volumes:
+      - type: bind
+        source: "${SIMC_WEB_ROOT:?Set SIMC_WEB_ROOT to the deployment directory}/input"
+        target: /data/input
+      - type: bind
+        source: "${SIMC_WEB_ROOT:?Set SIMC_WEB_ROOT to the deployment directory}/output"
+        target: /data/output
