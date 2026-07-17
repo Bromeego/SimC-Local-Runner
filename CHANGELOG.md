@@ -6,6 +6,11 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Check for the newest configured SimulationCraft image before every run by
+  default, while retaining configurable cached and offline pull policies.
+
 ## [0.1.0] - 2026-07-17
 
 ### Added

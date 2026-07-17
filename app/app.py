@@ -29,6 +29,11 @@ def env_int(name: str, default: int, minimum: int = 1) -> int:
     return max(value, minimum)
 
 
+def env_choice(name: str, default: str, choices: set[str]) -> str:
+    value = os.environ.get(name, default).strip().lower()
+    return value if value in choices else default
+
+
 app = Flask(__name__)
 
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
@@ -38,6 +43,11 @@ HOST_INPUT_DIR = os.environ.get("HOST_INPUT_DIR", "/srv/simc-web/input")
 HOST_OUTPUT_DIR = os.environ.get("HOST_OUTPUT_DIR", "/srv/simc-web/output")
 
 SIMC_IMAGE = os.environ.get("SIMC_IMAGE", "simulationcraftorg/simc:latest")
+SIMC_PULL_POLICY = env_choice(
+    "SIMC_PULL_POLICY",
+    "always",
+    {"always", "missing", "never"},
+)
 SIMC_CPUS = os.environ.get("SIMC_CPUS", "").strip()
 SIMC_MEMORY = os.environ.get("SIMC_MEMORY", "").strip()
 SIMC_TIMEOUT_SECONDS = env_int("SIMC_TIMEOUT_SECONDS", 1800, 30)
@@ -291,6 +301,7 @@ def save_run_metadata(
         "input_file": input_name,
         "report_file": output_name,
         "simc_image": SIMC_IMAGE,
+        "simc_pull_policy": SIMC_PULL_POLICY,
         "simc_image_resolved": resolve_simc_image(),
         "simc_version": detect_simc_version(process_output),
         "settings": settings,
@@ -407,6 +418,7 @@ def run_sim():
         cmd = [
             "docker",
             "run",
+            f"--pull={SIMC_PULL_POLICY}",
             "--rm",
             "--name",
             container_name,

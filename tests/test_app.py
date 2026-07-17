@@ -47,6 +47,15 @@ class SimcWebTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json, {"status": "ok"})
 
+    def test_invalid_pull_policy_falls_back_to_always(self):
+        with patch.dict(os.environ, {"TEST_PULL_POLICY": "sometimes"}):
+            policy = simc_app.env_choice(
+                "TEST_PULL_POLICY",
+                "always",
+                {"always", "missing", "never"},
+            )
+        self.assertEqual(policy, "always")
+
     def test_favicon_is_served(self):
         response = self.client.get("/static/favicon.svg")
         try:
@@ -121,7 +130,7 @@ class SimcWebTests(unittest.TestCase):
         if acquired:
             simc_app.SIMULATION_SLOTS.release()
 
-    def test_optional_docker_resource_limits_are_applied(self):
+    def test_pull_policy_and_optional_docker_resource_limits_are_applied(self):
         original_cpus = simc_app.SIMC_CPUS
         original_memory = simc_app.SIMC_MEMORY
         simc_app.SIMC_CPUS = "3"
@@ -130,6 +139,7 @@ class SimcWebTests(unittest.TestCase):
         def complete_run(command, **_kwargs):
             if command[1:3] == ["image", "inspect"]:
                 return SimpleNamespace(returncode=0, stderr="", stdout="[]")
+            self.assertIn("--pull=always", command)
             self.assertIn("--cpus", command)
             self.assertIn("3", command)
             self.assertIn("--memory", command)
@@ -178,6 +188,7 @@ class SimcWebTests(unittest.TestCase):
         metadata = json.loads(metadata_files[0].read_text())
         self.assertEqual(metadata["settings"]["fight_style"], "Patchwerk")
         self.assertEqual(metadata["settings"]["iterations"], 1000)
+        self.assertEqual(metadata["simc_pull_policy"], "always")
         self.assertEqual(metadata["simc_version"], "SimulationCraft 1200-01 test build")
         self.assertEqual(
             metadata["simc_image_resolved"],
