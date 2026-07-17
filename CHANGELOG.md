@@ -6,6 +6,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Add Windows and macOS/Linux launchers, a desktop-focused setup guide, and an
+  optional bind-folder Compose overlay for homelab deployments.
+
+### Changed
+
+- Use persistent Docker-managed volumes by default with no required `.env`
+  file or absolute host path.
+- Discover the web container's Docker mounts automatically so SimulationCraft
+  jobs can share either named volumes or homelab bind folders.
+
 ## [0.2.0] - 2026-07-17
 
 ### Added

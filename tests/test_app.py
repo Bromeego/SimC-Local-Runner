@@ -22,6 +22,8 @@ class SimcWebTests(unittest.TestCase):
         root = Path(self.temp_dir.name)
         simc_app.INPUT_DIR = root / "input"
         simc_app.OUTPUT_DIR = root / "output"
+        simc_app.HOST_INPUT_DIR = str(simc_app.INPUT_DIR)
+        simc_app.HOST_OUTPUT_DIR = str(simc_app.OUTPUT_DIR)
         simc_app.REPORT_RETENTION_COUNT = 100
         simc_app.SIMULATION_SLOTS = BoundedSemaphore(1)
         simc_app.app.config.update(TESTING=True, MAX_CONTENT_LENGTH=2 * 1024 * 1024)
@@ -55,6 +57,96 @@ class SimcWebTests(unittest.TestCase):
                 {"always", "missing", "never"},
             )
         self.assertEqual(policy, "always")
+
+    def test_data_mount_args_discovers_named_volumes(self):
+        details = [
+            {
+                "Mounts": [
+                    {
+                        "Type": "volume",
+                        "Name": "simc-input",
+                        "Source": "/var/lib/docker/volumes/simc-input/_data",
+                        "Destination": "/data/input",
+                    },
+                    {
+                        "Type": "volume",
+                        "Name": "simc-output",
+                        "Source": "/var/lib/docker/volumes/simc-output/_data",
+                        "Destination": "/data/output",
+                    },
+                ]
+            }
+        ]
+        completed = SimpleNamespace(
+            returncode=0,
+            stderr="",
+            stdout=json.dumps(details),
+        )
+
+        with (
+            patch.object(simc_app, "HOST_INPUT_DIR", ""),
+            patch.object(simc_app, "HOST_OUTPUT_DIR", ""),
+            patch.dict(os.environ, {"HOSTNAME": "controller-id"}, clear=False),
+            patch.object(simc_app.subprocess, "run", return_value=completed) as run,
+        ):
+            args = simc_app.data_mount_args()
+
+        run.assert_called_once_with(
+            ["docker", "inspect", "controller-id"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        self.assertEqual(
+            args,
+            [
+                "--mount",
+                "type=volume,source=simc-input,target=/input,readonly",
+                "--mount",
+                "type=volume,source=simc-output,target=/output",
+            ],
+        )
+
+    def test_data_mount_args_discovers_bind_mounts(self):
+        details = [
+            {
+                "Mounts": [
+                    {
+                        "Type": "bind",
+                        "Source": "/srv/simc-web/input",
+                        "Destination": "/data/input",
+                    },
+                    {
+                        "Type": "bind",
+                        "Source": "/srv/simc-web/output",
+                        "Destination": "/data/output",
+                    },
+                ]
+            }
+        ]
+        completed = SimpleNamespace(
+            returncode=0,
+            stderr="",
+            stdout=json.dumps(details),
+        )
+
+        with (
+            patch.object(simc_app, "HOST_INPUT_DIR", ""),
+            patch.object(simc_app, "HOST_OUTPUT_DIR", ""),
+            patch.dict(os.environ, {"HOSTNAME": "controller-id"}, clear=False),
+            patch.object(simc_app.subprocess, "run", return_value=completed),
+        ):
+            args = simc_app.data_mount_args()
+
+        self.assertEqual(
+            args,
+            [
+                "--mount",
+                "type=bind,source=/srv/simc-web/input,target=/input,readonly",
+                "--mount",
+                "type=bind,source=/srv/simc-web/output,target=/output",
+            ],
+        )
 
     def test_favicon_is_served(self):
         response = self.client.get("/static/favicon.svg")
@@ -217,6 +309,8 @@ class SimcWebTests(unittest.TestCase):
             self.assertIn("--memory", command)
             self.assertIn("2g", command)
             self.assertIn("--name", command)
+            self.assertIn("--mount", command)
+            self.assertIn("target=/input,readonly", " ".join(command))
             output_name = Path(command[-1].split("=", 1)[1]).name
             simc_app.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
             (simc_app.OUTPUT_DIR / output_name).write_text(

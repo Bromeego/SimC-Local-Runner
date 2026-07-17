@@ -40,8 +40,8 @@ app = Flask(__name__)
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/data/output"))
 
-HOST_INPUT_DIR = os.environ.get("HOST_INPUT_DIR", "/srv/simc-web/input")
-HOST_OUTPUT_DIR = os.environ.get("HOST_OUTPUT_DIR", "/srv/simc-web/output")
+HOST_INPUT_DIR = os.environ.get("HOST_INPUT_DIR", "").strip()
+HOST_OUTPUT_DIR = os.environ.get("HOST_OUTPUT_DIR", "").strip()
 
 SIMC_IMAGE = os.environ.get("SIMC_IMAGE", "simulationcraftorg/simc:latest")
 SIMC_PULL_POLICY = env_choice(
@@ -65,6 +65,84 @@ FIGHT_STYLES = {
     "hecticaddcleave": "HecticAddCleave",
     "dungeonslice": "DungeonSlice",
 }
+
+
+class DataMountError(RuntimeError):
+    """Raised when the SimulationCraft container cannot share app data."""
+
+
+def docker_mount_option(mount: dict, target: str, read_only: bool = False) -> str:
+    mount_type = mount.get("Type")
+    if mount_type == "volume":
+        source = mount.get("Name")
+    elif mount_type == "bind":
+        source = mount.get("Source")
+    else:
+        raise DataMountError(f"Unsupported Docker mount type: {mount_type or 'unknown'}")
+
+    if not source:
+        raise DataMountError(f"Docker did not report a source for {target}.")
+    if "," in source:
+        raise DataMountError(f"Docker mount sources cannot contain commas: {source}")
+
+    options = [f"type={mount_type}", f"source={source}", f"target={target}"]
+    if read_only:
+        options.append("readonly")
+    return ",".join(options)
+
+
+def data_mount_args() -> list[str]:
+    """Return Docker CLI mounts that reuse this container's data storage."""
+    if HOST_INPUT_DIR or HOST_OUTPUT_DIR:
+        if not HOST_INPUT_DIR or not HOST_OUTPUT_DIR:
+            raise DataMountError(
+                "HOST_INPUT_DIR and HOST_OUTPUT_DIR must be set together."
+            )
+        mounts = {
+            "/data/input": {"Type": "bind", "Source": HOST_INPUT_DIR},
+            "/data/output": {"Type": "bind", "Source": HOST_OUTPUT_DIR},
+        }
+    else:
+        container_ref = os.environ.get("SIMC_WEB_CONTAINER", "").strip()
+        if not container_ref:
+            container_ref = os.environ.get("HOSTNAME", "").strip()
+        if not container_ref:
+            raise DataMountError("The web container identity is unavailable.")
+
+        try:
+            result = subprocess.run(
+                ["docker", "inspect", container_ref],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired) as error:
+            raise DataMountError(f"Docker could not inspect the web container: {error}")
+
+        if result.returncode != 0:
+            details = (result.stderr or result.stdout or "unknown Docker error").strip()
+            raise DataMountError(f"Docker could not inspect the web container: {details}")
+
+        try:
+            details = json.loads(result.stdout)[0]
+            mounts = {
+                mount["Destination"]: mount for mount in details.get("Mounts", [])
+            }
+        except (IndexError, KeyError, TypeError, json.JSONDecodeError) as error:
+            raise DataMountError(f"Docker returned invalid mount details: {error}")
+
+    try:
+        input_mount = mounts["/data/input"]
+        output_mount = mounts["/data/output"]
+    except KeyError as error:
+        raise DataMountError(f"The web container is missing the {error.args[0]} mount.")
+
+    return [
+        "--mount",
+        docker_mount_option(input_mount, "/input", read_only=True),
+        "--mount",
+        docker_mount_option(output_mount, "/output"),
+    ]
 
 
 def ensure_data_dirs() -> None:
@@ -570,6 +648,16 @@ def run_sim():
 
     try:
         ensure_data_dirs()
+        try:
+            mount_args = data_mount_args()
+        except DataMountError as error:
+            return render_error(
+                503,
+                "Docker storage is unavailable",
+                "The runner could not share its saved data with SimulationCraft.",
+                str(error),
+            )
+
         input_name, output_name = build_names(report_name, uploaded_filename)
         input_path = INPUT_DIR / input_name
         input_path.write_text(final_text, encoding="utf-8")
@@ -583,11 +671,8 @@ def run_sim():
             "--rm",
             "--name",
             container_name,
-            "-v",
-            f"{HOST_INPUT_DIR}:/input",
-            "-v",
-            f"{HOST_OUTPUT_DIR}:/output",
         ]
+        cmd.extend(mount_args)
         if SIMC_CPUS:
             cmd.extend(["--cpus", SIMC_CPUS])
         if SIMC_MEMORY:
