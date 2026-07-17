@@ -45,7 +45,7 @@ report that is easy to understand and maintain.
 
 - A Linux host with Docker Engine and Docker Compose
 - Permission to access the Docker socket
-- An absolute host path where this repository will live
+- An absolute host path for the deployment and its saved data
 
 The app runs a second container for each simulation. It therefore mounts the
 host Docker socket and needs the host's absolute paths to the `input` and
@@ -72,17 +72,18 @@ host Docker socket and needs the host's absolute paths to the `input` and
    cp .env.example .env
    ```
 
-4. Edit `.env` and set `SIMC_WEB_ROOT` to the absolute path of this repository
+4. Edit `.env` and set `SIMC_WEB_ROOT` to the absolute path of this directory
    on the Docker host. For example:
 
    ```dotenv
    SIMC_WEB_ROOT=/srv/simc-web
    ```
 
-5. Build and start the app:
+5. Pull the published image and start the app:
 
    ```sh
-   docker compose up -d --build
+   docker compose pull
+   docker compose up -d
    ```
 
 6. Open `http://HOSTNAME-OR-IP:8088`.
@@ -99,18 +100,19 @@ Stop the app with:
 docker compose down
 ```
 
-### Using the published image
+### Building locally
 
-The included workflow builds `linux/amd64` and `linux/arm64` images in GitHub
-Container Registry. Use the published image without rebuilding locally:
+The default Compose file uses the published `linux/amd64` or `linux/arm64`
+image from GitHub Container Registry. To build the web app from this checkout
+instead, add the local-build override:
 
 ```sh
-SIMC_WEB_IMAGE=ghcr.io/bromeego/simc-local-runner:latest docker compose pull simc-web
-SIMC_WEB_IMAGE=ghcr.io/bromeego/simc-local-runner:latest docker compose up -d --no-build
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
-Add the same `SIMC_WEB_IMAGE` value to `.env` to make it permanent. Tagged
-releases such as `v0.1.0` also produce matching immutable container tags.
+Remove the override when you want to return to the published image. Release
+tags such as `v0.1.0` also produce matching container image tags, which can be
+set with `SIMC_WEB_IMAGE` when you prefer to pin a version.
 
 ## Configuration
 
@@ -118,9 +120,9 @@ The example values live in [`.env.example`](.env.example).
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `SIMC_WEB_ROOT` | Required | Absolute host path to this repository |
+| `SIMC_WEB_ROOT` | Required | Absolute host path to the deployment directory |
 | `SIMC_WEB_PORT` | `8088` | Port exposed by the web app |
-| `SIMC_WEB_IMAGE` | `simc-web:local` | Optional prebuilt web image, such as a GHCR image |
+| `SIMC_WEB_IMAGE` | `ghcr.io/bromeego/simc-local-runner:latest` | Web interface image used by Compose |
 | `TZ` | `UTC` | Container timezone, using an IANA timezone name |
 | `SIMC_IMAGE` | `simulationcraftorg/simc:latest` | SimulationCraft image used for runs |
 | `SIMC_CPUS` | Unset | Optional CPU limit passed to each simulation container |
@@ -160,16 +162,20 @@ the configured retention count is exceeded.
 
 ## Updating
 
-Pull the latest project changes and rebuild the web image:
+Pull the latest project and container changes:
 
 ```sh
 git pull
+docker compose pull simc-web
 docker pull simulationcraftorg/simc:latest
-docker compose up -d --build
+docker compose up -d
 ```
 
 If `SIMC_IMAGE` is customized, pull that image instead. Existing inputs and
 reports remain in their bind-mounted directories.
+
+For a local build, use the two-file command from the Building locally section
+after pulling the latest project changes.
 
 ## Project layout
 
@@ -193,7 +199,8 @@ reports remain in their bind-mounted directories.
 |-- LICENSE
 |-- SECURITY.md
 |-- .env.example
-`-- compose.yaml
+|-- compose.build.yaml     # Local source-build override
+`-- compose.yaml           # Published-image deployment
 ```
 
 ## Troubleshooting
@@ -206,7 +213,7 @@ running and that the socket is mounted as shown in `compose.yaml`.
 ### Simulation starts but no report appears
 
 Check the app logs and verify that `SIMC_WEB_ROOT` exactly matches the absolute
-repository path on the Docker host. The `input/` and `output/` directories must
+deployment path on the Docker host. The `input/` and `output/` directories must
 also be writable.
 
 ### SimulationCraft image cannot be pulled
@@ -240,6 +247,7 @@ Validate the deployment and build the web image with:
 
 ```sh
 SIMC_WEB_ROOT=/tmp/simc-web docker compose config --quiet
+SIMC_WEB_ROOT=/tmp/simc-web docker compose -f compose.yaml -f compose.build.yaml config --quiet
 docker build -t simc-web:test app
 ```
 

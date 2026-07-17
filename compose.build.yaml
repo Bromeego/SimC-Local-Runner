@@ -1,0 +1,5 @@
+services:
+  simc-web:
+    image: simc-web:local
+    build:
+      context: ./app
