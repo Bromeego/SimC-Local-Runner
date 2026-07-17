@@ -6,6 +6,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-17
+
 ### Changed
 
 - Check for the newest configured SimulationCraft image before every run by
@@ -43,5 +45,6 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Unique per-run filenames and container names.
 - Documented the Docker socket trust boundary.
 
-[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Bromeego/SimC-Local-Runner/releases/tag/v0.1.0
