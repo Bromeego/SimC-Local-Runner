@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+
+{% block title %}Run a simulation | SimulationCraft Local{% endblock %}
+
+{% block content %}
+<main class="page-shell">
+  {% if deleted %}
+    <div class="toast" role="status">Report and matching profile deleted.</div>
+  {% endif %}
+
+  <div class="workspace">
+    <section class="run-panel surface" aria-labelledby="run-title">
+      <div class="section-heading">
+        <p class="eyebrow">New simulation</p>
+        <h1 id="run-title">Put a profile through its paces.</h1>
+        <p>Tune the encounter, add a profile, and let the local runner handle the rest.</p>
+      </div>
+
+      <form id="sim-form" method="post" action="{{ url_for('run_sim') }}" enctype="multipart/form-data">
+        <div class="field-block">
+          <label for="report_name">Report name <span>optional</span></label>
+          <input id="report_name" type="text" name="report_name" maxlength="80" placeholder="raid-single-target" autocomplete="off">
+          <p class="field-help">Use a short label you will recognize in the report archive.</p>
+        </div>
+
+        <div class="form-grid">
+          <div class="field-block">
+            <label for="fight_style">Fight style</label>
+            <select name="fight_style" id="fight_style">
+              <option value="patchwerk">Patchwerk</option>
+              <option value="hecticaddcleave">HecticAddCleave</option>
+              <option value="dungeonslice">DungeonSlice</option>
+            </select>
+            <p class="field-help" id="fight-style-help"></p>
+          </div>
+
+          <div class="field-block">
+            <label for="iterations">Iterations</label>
+            <input id="iterations" type="number" name="iterations" min="100" max="50000" value="10000" inputmode="numeric">
+            <p class="field-help">Higher values are steadier but take longer.</p>
+          </div>
+
+          <div class="field-block" id="desired-targets-field">
+            <label for="desired_targets">Desired targets</label>
+            <input id="desired_targets" type="number" name="desired_targets" min="1" max="20" value="1" inputmode="numeric">
+            <p class="field-help" id="desired-targets-note">Use a fixed target count for direct comparisons.</p>
+          </div>
+
+          <div class="field-block" id="max-time-field">
+            <label for="max_time">Max time <span>seconds</span></label>
+            <input id="max_time" type="number" name="max_time" min="30" max="1800" value="300" inputmode="numeric">
+            <p class="field-help" id="max-time-note">Controls the simulated encounter length.</p>
+          </div>
+        </div>
+
+        <div class="profile-source">
+          <div class="field-block file-block">
+            <label for="simc_file">Upload a profile</label>
+            <label class="file-zone" id="file-zone" for="simc_file" data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}">
+              <strong id="file-label">Drop a .simc file here</strong>
+              <span id="file-hint">or click to browse / maximum {{ max_upload_mb }} MB</span>
+            </label>
+            <input id="simc_file" type="file" name="simc_file" accept=".simc,.txt" aria-describedby="file-hint">
+          </div>
+
+          <div class="source-divider"><span>or paste it</span></div>
+
+          <div class="field-block">
+            <label for="simc_text">Profile contents</label>
+            <textarea id="simc_text" name="simc_text" spellcheck="false" placeholder="Paste an exported SimulationCraft profile here"></textarea>
+            <p class="field-help">If both sources are provided, the uploaded file wins.</p>
+          </div>
+        </div>
+
+        <div class="run-actions">
+          <button class="primary-button" id="run-button" type="submit">Run simulation</button>
+          <p>The runner allows one job at a time and stops it after {{ timeout_minutes }} minutes.</p>
+        </div>
+
+        <div class="run-status" id="run-status" role="status" aria-live="polite" hidden>
+          <div>
+            <strong>Simulation running</strong>
+            <span id="elapsed-time">0:00 elapsed</span>
+          </div>
+          <div class="progress-track" aria-hidden="true"><span></span></div>
+          <p>Keep this tab open. The finished report will replace this page.</p>
+        </div>
+      </form>
+    </section>
+
+    <aside class="sidebar" aria-label="Simulation guidance and reports">
+      <section class="guide-panel surface-subtle">
+        <h2>Encounter guide</h2>
+        <p>Pick the model that matches the question you are asking.</p>
+
+        <div class="guide-list">
+          <details open>
+            <summary>Patchwerk</summary>
+            <p>Clean, stationary combat for single-target and fixed target-count comparisons.</p>
+          </details>
+          <details>
+            <summary>HecticAddCleave</summary>
+            <p>Movement and recurring adds for a messier cleave-focused encounter.</p>
+          </details>
+          <details>
+            <summary>DungeonSlice</summary>
+            <p>Built-in boss and trash phases. Target count and max time are handled by the model.</p>
+          </details>
+        </div>
+      </section>
+
+      <section class="reports-panel surface-subtle" aria-labelledby="reports-title">
+        <div class="reports-heading">
+          <div>
+            <h2 id="reports-title">Reports</h2>
+            <p>{{ report_count }} saved, up to {{ retention_count }} retained</p>
+          </div>
+        </div>
+
+        {% if reports %}
+          <div class="report-list">
+            {% for report in reports %}
+              <article class="report-row">
+                <a href="{{ url_for('serve_report', filename=report.filename) }}">
+                  <strong>{{ report.label }}</strong>
+                  <span>{{ report.created }} / {{ report.size }}</span>
+                  {% if report.summary %}
+                    <span class="report-summary"{% if report.image %} title="SimulationCraft image: {{ report.image }}"{% endif %}>{{ report.summary }}</span>
+                  {% endif %}
+                </a>
+                <form method="post" action="{{ url_for('delete_report', filename=report.filename) }}" data-delete-report>
+                  <button type="submit" class="delete-button" aria-label="Delete {{ report.label }}">Delete</button>
+                </form>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <strong>No reports yet</strong>
+            <p>Your completed simulations will collect here.</p>
+          </div>
+        {% endif %}
+      </section>
+    </aside>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} | SimulationCraft Local{% endblock %}
+
+{% block content %}
+<main class="error-shell">
+  <section class="error-panel surface" aria-labelledby="error-title">
+    <p class="error-code">{{ status_code }}</p>
+    <h1 id="error-title">{{ title }}</h1>
+    <p class="error-message">{{ message }}</p>
+
+    {% if details %}
+      <details class="error-details">
+        <summary>Show technical details</summary>
+        <pre>{{ details }}</pre>
+      </details>
+    {% endif %}
+
+    <a class="primary-button link-button" href="{{ url_for('index') }}">Back to runner</a>
+  </section>
+</main>
+{% endblock %}

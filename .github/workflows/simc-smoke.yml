@@ -1,0 +1,29 @@
+name: SimulationCraft smoke test
+
+on:
+  schedule:
+    - cron: "23 15 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Run official SimulationCraft image
+        run: sh tests/smoke-test.sh
+
+      - name: Upload smoke report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: simulationcraft-smoke-output
+          path: smoke-output/
+          if-no-files-found: ignore
+          retention-days: 7

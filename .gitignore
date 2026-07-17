@@ -1,0 +1,18 @@
+# Local configuration
+.env
+
+# Generated SimulationCraft data
+input/*
+output/*
+smoke-output/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

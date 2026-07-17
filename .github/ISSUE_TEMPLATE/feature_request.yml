@@ -1,0 +1,31 @@
+name: Feature request
+description: Suggest a focused improvement for the local runner.
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the SimulationCraft workflow that is awkward today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Where does it fit?
+      options:
+        - Simulation settings
+        - Profile upload or editing
+        - Reports and history
+        - Deployment and maintenance
+        - Interface and accessibility
+        - Other
+    validations:
+      required: true

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: SimulationCraft questions
+    url: https://github.com/simulationcraft/simc/wiki
+    about: Use the upstream documentation for profile syntax and simulation-engine questions.

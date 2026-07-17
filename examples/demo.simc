@@ -1,0 +1,13 @@
+# Minimal, anonymous profile for testing simc-web.
+#
+# SimulationCraft supplies the current maximum level and its maintained default
+# action list. The web interface adds fight_style, iterations, desired_targets,
+# and max_time when this file is submitted.
+
+mage="SimcWebDemo"
+race=human
+spec=frost
+role=spell
+position=back
+
+# Keep this profile intentionally free of imported character or account data.

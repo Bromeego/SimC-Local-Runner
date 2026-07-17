@@ -1,0 +1,53 @@
+name: Bug report
+description: Tell us about a reproducible problem with simc-web.
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve simc-web. Remove character names, realm names, paths, and other personal details before posting logs or profiles.
+  - type: input
+    id: version
+    attributes:
+      label: simc-web version
+      description: Release tag, container tag, or commit if known.
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: simc-image
+    attributes:
+      label: SimulationCraft image
+      description: The SIMC_IMAGE value or resolved digest from the report metadata.
+      placeholder: simulationcraftorg/simc:latest
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Explain the result you saw and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open...
+        2. Choose...
+        3. Run...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste only redacted app logs. This field is rendered as code.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed character, account, realm, path, and other personal information.
+          required: true
