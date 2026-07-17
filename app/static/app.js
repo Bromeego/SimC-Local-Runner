@@ -16,6 +16,7 @@
   const runButton = document.getElementById("run-button");
   const runStatus = document.getElementById("run-status");
   const elapsedTime = document.getElementById("elapsed-time");
+  const engineStatus = document.getElementById("engine-status");
   let elapsedTimer = null;
 
   const styleCopy = {
@@ -156,6 +157,62 @@
       const seconds = String(totalSeconds % 60).padStart(2, "0");
       elapsedTime.textContent = `${minutes}:${seconds} elapsed`;
     }, 1000);
+  });
+
+  if (engineStatus) {
+    document.addEventListener("click", function (event) {
+      if (!engineStatus.contains(event.target)) engineStatus.removeAttribute("open");
+    });
+
+    engineStatus.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        engineStatus.removeAttribute("open");
+        engineStatus.querySelector("summary").focus();
+      }
+    });
+  }
+
+  function fallbackCopy(value) {
+    const copyField = document.createElement("textarea");
+    copyField.value = value;
+    copyField.setAttribute("readonly", "");
+    copyField.style.position = "fixed";
+    copyField.style.opacity = "0";
+    document.body.appendChild(copyField);
+    copyField.select();
+    let copied = false;
+    try {
+      copied = document.execCommand("copy");
+    } catch (_error) {
+      copied = false;
+    } finally {
+      copyField.remove();
+    }
+    return copied;
+  }
+
+  document.querySelectorAll("[data-copy-value]").forEach(function (copyButton) {
+    copyButton.addEventListener("click", async function () {
+      const value = copyButton.dataset.copyValue;
+      let copied = false;
+
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(value);
+          copied = true;
+        } catch (_error) {
+          copied = fallbackCopy(value);
+        }
+      } else {
+        copied = fallbackCopy(value);
+      }
+
+      const originalLabel = copyButton.textContent;
+      copyButton.textContent = copied ? "Copied" : "Copy failed";
+      window.setTimeout(function () {
+        copyButton.textContent = originalLabel;
+      }, 1800);
+    });
   });
 
   document.querySelectorAll("[data-delete-report]").forEach(function (deleteForm) {

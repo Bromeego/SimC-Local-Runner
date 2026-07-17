@@ -29,7 +29,76 @@
         <small>Local simulation runner</small>
       </span>
     </a>
-    <button class="theme-toggle" id="theme-toggle" type="button">Theme</button>
+    <div class="header-actions">
+      {% if simc_status is defined %}
+        <details class="engine-status" id="engine-status">
+          <summary class="engine-summary" aria-label="SimulationCraft {{ simc_status.channel_label | lower }} build details">
+            <span>SimC {{ simc_status.channel_label }}</span>
+            {% if simc_status.available %}
+              <code>{{ simc_status.version }}</code>
+            {% else %}
+              <small>Version pending</small>
+            {% endif %}
+          </summary>
+
+          <div class="engine-popover">
+            <p class="engine-kicker">
+              {% if simc_status.available %}Latest completed run{% else %}Simulation engine{% endif %}
+            </p>
+            <div class="engine-popover-heading">
+              <strong>SimulationCraft {{ simc_status.channel_label }}</strong>
+              {% if simc_status.available %}<code>{{ simc_status.version }}</code>{% endif %}
+            </div>
+
+            {% if simc_status.available %}
+              <dl class="engine-facts">
+                {% if simc_status.wow_version %}
+                  <div>
+                    <dt>World of Warcraft</dt>
+                    <dd>{{ simc_status.wow_version }}{% if simc_status.wow_channel %} {{ simc_status.wow_channel }}{% endif %}</dd>
+                  </div>
+                {% endif %}
+                {% if simc_status.hotfix_date %}
+                  <div>
+                    <dt>Hotfix</dt>
+                    <dd>{{ simc_status.hotfix_date }}{% if simc_status.hotfix_build %}, build {{ simc_status.hotfix_build }}{% endif %}</dd>
+                  </div>
+                {% endif %}
+                {% if simc_status.git_commit %}
+                  <div>
+                    <dt>Source commit</dt>
+                    <dd><a href="{{ simc_status.git_url }}" target="_blank" rel="noopener noreferrer">View {{ simc_status.git_commit }}</a></dd>
+                  </div>
+                {% endif %}
+                {% if simc_status.created %}
+                  <div>
+                    <dt>Report created</dt>
+                    <dd>{{ simc_status.created }}</dd>
+                  </div>
+                {% endif %}
+                <div>
+                  <dt>{{ simc_status.channel_label }} image</dt>
+                  <dd><code>{{ simc_status.image_source }}</code></dd>
+                </div>
+              </dl>
+
+              <div class="engine-image">
+                <span>Image digest</span>
+                <code title="{{ simc_status.image }}">{{ simc_status.image_digest_short or simc_status.image }}</code>
+                {% if simc_status.image_digest %}
+                  <button type="button" data-copy-value="{{ simc_status.image_digest }}">Copy digest</button>
+                {% endif %}
+              </div>
+            {% else %}
+              <p class="engine-empty">Run your first simulation to record the exact SimC, WoW, hotfix, and source builds used.</p>
+            {% endif %}
+
+            <p class="engine-update-note">{{ simc_status.update_note }}</p>
+          </div>
+        </details>
+      {% endif %}
+      <button class="theme-toggle" id="theme-toggle" type="button">Theme</button>
+    </div>
   </header>
 
   {% block content %}{% endblock %}

@@ -36,6 +36,7 @@ report that is easy to understand and maintain.
 - Saved input profiles and HTML reports
 - Report metadata, manual deletion, and automatic retention
 - Reproducibility metadata with image digest, SimC version, settings, and run time
+- Compact nightly-build badge with WoW, hotfix, source commit, and image details
 - Automatic SimulationCraft image updates before every run
 - Bounded uploads, simulation concurrency, and run time
 - Threaded Gunicorn serving with a container health check
@@ -166,6 +167,11 @@ Each successful report also gets a matching `.json` metadata file in `output/`.
 It records the exact SimulationCraft image digest when Docker exposes one, the
 version line reported by SimC, chosen settings, UTC creation time, and wall-clock
 run duration. This makes it much easier to reproduce or explain an older result.
+
+The header badge shows the SimulationCraft nightly used by the latest completed
+report. Hover over it, focus it with the keyboard, or select it on a touch device
+to see the matching WoW build, hotfix, upstream commit, and container digest. The
+update note in the same panel reflects the configured `SIMC_PULL_POLICY`.
 
 Deleting a report from the interface also deletes its matching saved input.
 After each successful run, the oldest report and matching input are removed when

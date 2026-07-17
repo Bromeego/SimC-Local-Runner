@@ -73,9 +73,72 @@ class SimcWebTests(unittest.TestCase):
         self.assertIn("Simulation running", page)
         self.assertIn("Drop a .simc file here", page)
         self.assertIn("raid-single-target", page)
+        self.assertIn("SimC Nightly", page)
+        self.assertIn("Version pending", page)
+        self.assertIn("Docker checks for a newer nightly before every simulation.", page)
         self.assertIn('rel="icon" href="/static/favicon.svg"', page)
         self.assertNotIn("—", page)
         self.assertNotIn("–", page)
+
+    def test_extract_simc_build_from_report_html(self):
+        report_html = """
+            <p>
+              <a href="https://www.simulationcraft.org/">SimulationCraft 1205-01</a>
+              for World of Warcraft 12.0.7.68453 Live
+              (hotfix 2026-07-13/68453, git build
+              <a href="https://github.com/simulationcraft/simc/commit/30e0b5f">30e0b5f</a>)
+            </p>
+        """
+
+        build = simc_app.extract_simc_build(report_html)
+
+        self.assertEqual(build["version"], "1205-01")
+        self.assertEqual(build["wow_version"], "12.0.7.68453")
+        self.assertEqual(build["wow_channel"], "Live")
+        self.assertEqual(build["hotfix_date"], "2026-07-13")
+        self.assertEqual(build["hotfix_build"], "68453")
+        self.assertEqual(build["git_commit"], "30e0b5f")
+
+    def test_index_shows_latest_report_build_in_engine_badge(self):
+        simc_app.ensure_data_dirs()
+        report = simc_app.OUTPUT_DIR / "raid-test.html"
+        report.write_text(
+            """
+            <p>
+              <a>SimulationCraft 1205-01</a> for World of Warcraft
+              12.0.7.68453 Live (hotfix 2026-07-13/68453,
+              git build <a>30e0b5f</a>)
+            </p>
+            """
+        )
+        simc_app.metadata_path(report.name).write_text(
+            json.dumps(
+                {
+                    "simc_image": "simulationcraftorg/simc:latest",
+                    "simc_image_resolved": (
+                        "simulationcraftorg/simc@sha256:"
+                        "1234567890abcdef1234567890abcdef"
+                    ),
+                }
+            )
+        )
+
+        response = self.client.get("/")
+        page = response.get_data(as_text=True)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("SimC Nightly", page)
+        self.assertIn("1205-01", page)
+        self.assertIn("12.0.7.68453 Live", page)
+        self.assertIn("2026-07-13, build 68453", page)
+        self.assertIn("View 30e0b5f", page)
+        self.assertIn("Nightly image", page)
+        self.assertIn("simulationcraftorg/simc:latest", page)
+        self.assertIn(
+            "https://github.com/simulationcraft/simc/commit/30e0b5f",
+            page,
+        )
+        self.assertIn("Copy digest", page)
 
     def test_safe_name_and_unique_filenames(self):
         self.assertEqual(simc_app.safe_name(" My Report !! "), "my-report")
@@ -147,7 +210,13 @@ class SimcWebTests(unittest.TestCase):
             self.assertIn("--name", command)
             output_name = Path(command[-1].split("=", 1)[1]).name
             simc_app.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            (simc_app.OUTPUT_DIR / output_name).write_text("<html>ok</html>")
+            (simc_app.OUTPUT_DIR / output_name).write_text(
+                """
+                <p>SimulationCraft 1205-01 for World of Warcraft
+                12.0.7.68453 Live (hotfix 2026-07-13/68453,
+                git build 30e0b5f)</p>
+                """
+            )
             return SimpleNamespace(returncode=0, stderr="", stdout="")
 
         try:
@@ -169,7 +238,13 @@ class SimcWebTests(unittest.TestCase):
                 )
             output_name = Path(command[-1].split("=", 1)[1]).name
             simc_app.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            (simc_app.OUTPUT_DIR / output_name).write_text("<html>ok</html>")
+            (simc_app.OUTPUT_DIR / output_name).write_text(
+                """
+                <p>SimulationCraft 1205-01 for World of Warcraft
+                12.0.7.68453 Live (hotfix 2026-07-13/68453,
+                git build 30e0b5f)</p>
+                """
+            )
             return SimpleNamespace(
                 returncode=0,
                 stderr="",
@@ -190,6 +265,10 @@ class SimcWebTests(unittest.TestCase):
         self.assertEqual(metadata["settings"]["iterations"], 1000)
         self.assertEqual(metadata["simc_pull_policy"], "always")
         self.assertEqual(metadata["simc_version"], "SimulationCraft 1200-01 test build")
+        self.assertEqual(metadata["schema_version"], 2)
+        self.assertEqual(metadata["simc_build"]["version"], "1205-01")
+        self.assertEqual(metadata["simc_build"]["wow_version"], "12.0.7.68453")
+        self.assertEqual(metadata["simc_build"]["git_commit"], "30e0b5f")
         self.assertEqual(
             metadata["simc_image_resolved"],
             "simulationcraftorg/simc@sha256:abc123",

@@ -33,6 +33,23 @@ function makeElement(overrides = {}) {
 
 test("back navigation resets transient simulation progress", () => {
   const form = makeElement();
+  let engineCloseCount = 0;
+  let engineSummaryFocused = false;
+  const engineStatus = makeElement({
+    contains() {
+      return false;
+    },
+    querySelector() {
+      return {
+        focus() {
+          engineSummaryFocused = true;
+        }
+      };
+    },
+    removeAttribute(name) {
+      if (name === "open") engineCloseCount += 1;
+    }
+  });
   const elements = {
     "sim-form": form,
     fight_style: makeElement({ value: "patchwerk" }),
@@ -50,14 +67,19 @@ test("back navigation resets transient simulation progress", () => {
     simc_text: makeElement({ value: "mage=example" }),
     "run-button": makeElement({ textContent: "Run simulation" }),
     "run-status": makeElement({ hidden: true }),
-    "elapsed-time": makeElement({ textContent: "0:00 elapsed" })
+    "elapsed-time": makeElement({ textContent: "0:00 elapsed" }),
+    "engine-status": engineStatus
   };
   const windowListeners = {};
+  const documentListeners = {};
   const clearedTimers = [];
   const context = {
     DataTransfer: class {},
     Date,
     document: {
+      addEventListener(name, handler) {
+        documentListeners[name] = handler;
+      },
       getElementById(id) {
         return elements[id];
       },
@@ -93,4 +115,11 @@ test("back navigation resets transient simulation progress", () => {
   assert.equal(elements["run-button"].textContent, "Run simulation");
   assert.equal(elements["run-status"].hidden, true);
   assert.equal(elements["elapsed-time"].textContent, "0:00 elapsed");
+
+  documentListeners.click({ target: {} });
+  assert.equal(engineCloseCount, 1);
+
+  engineStatus._listeners.keydown({ key: "Escape" });
+  assert.equal(engineCloseCount, 2);
+  assert.equal(engineSummaryFocused, true);
 });

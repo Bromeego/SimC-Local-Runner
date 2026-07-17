@@ -6,6 +6,12 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Show the SimulationCraft nightly used by the latest completed report in an
+  accessible header badge, with WoW build, hotfix, source commit, image digest,
+  and update-policy details.
+
 ## [0.1.1] - 2026-07-17
 
 ### Changed

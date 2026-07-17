@@ -1,3 +1,4 @@
+import html
 import json
 import os
 import re
@@ -271,6 +272,153 @@ def detect_simc_version(output: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+def report_text(path: Path, max_bytes: int = 512 * 1024) -> str:
+    """Read enough of a generated report to cover its build header."""
+    try:
+        with path.open("rb") as report_file:
+            return report_file.read(max_bytes).decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def extract_simc_build(*sources: str) -> dict[str, str]:
+    """Extract structured engine details from SimC output or report HTML."""
+    build: dict[str, str] = {}
+
+    for source in sources:
+        if not source:
+            continue
+
+        visible = re.sub(
+            r"(?is)<(?:script|style)\b[^>]*>.*?</(?:script|style)>",
+            " ",
+            source,
+        )
+        visible = re.sub(r"(?s)<[^>]+>", " ", visible)
+        visible = re.sub(r"\s+", " ", html.unescape(visible)).strip()
+
+        version_match = re.search(
+            r"\bSimulationCraft\s+(?P<version>[0-9][A-Za-z0-9._-]*)",
+            visible,
+            re.IGNORECASE,
+        )
+        if version_match and not build.get("version"):
+            build["version"] = version_match.group("version")
+
+        wow_match = re.search(
+            r"\bWorld of Warcraft\s+"
+            r"(?P<version>[0-9]+(?:\.[0-9]+)+)"
+            r"(?:\s+(?P<channel>Live|PTR|Beta|Alpha))?",
+            visible,
+            re.IGNORECASE,
+        )
+        if wow_match:
+            build.setdefault("wow_version", wow_match.group("version"))
+            if wow_match.group("channel"):
+                build.setdefault("wow_channel", wow_match.group("channel"))
+
+        hotfix_match = re.search(
+            r"\bhotfix\s+(?P<date>\d{4}-\d{2}-\d{2})/"
+            r"(?P<build>[0-9]+)",
+            visible,
+            re.IGNORECASE,
+        )
+        if hotfix_match:
+            build.setdefault("hotfix_date", hotfix_match.group("date"))
+            build.setdefault("hotfix_build", hotfix_match.group("build"))
+
+        commit_match = re.search(
+            r"\bgit build\s+(?P<commit>[0-9a-f]{7,40})\b",
+            visible,
+            re.IGNORECASE,
+        )
+        if commit_match:
+            build.setdefault("git_commit", commit_match.group("commit").lower())
+
+    return build
+
+
+def is_nightly_image(image: str) -> bool:
+    return image.strip().lower() == "simulationcraftorg/simc:latest"
+
+
+def simc_update_note() -> str:
+    image_kind = "nightly" if is_nightly_image(SIMC_IMAGE) else "image"
+    if SIMC_PULL_POLICY == "always":
+        return f"Docker checks for a newer {image_kind} before every simulation."
+    if SIMC_PULL_POLICY == "missing":
+        return f"Docker uses the cached {image_kind} while it is available locally."
+    return "Docker uses the configured local image without checking for updates."
+
+
+def simc_status(filename: str = "", created: str = "") -> dict[str, str | bool]:
+    """Build the latest-engine status shown in the page header."""
+    status: dict[str, str | bool] = {
+        "available": False,
+        "channel_label": "Nightly" if is_nightly_image(SIMC_IMAGE) else "Engine",
+        "version": "",
+        "wow_version": "",
+        "wow_channel": "",
+        "hotfix_date": "",
+        "hotfix_build": "",
+        "git_commit": "",
+        "git_url": "",
+        "image": SIMC_IMAGE,
+        "image_source": SIMC_IMAGE,
+        "image_digest": "",
+        "image_digest_short": "",
+        "created": created,
+        "update_note": simc_update_note(),
+    }
+    if not filename:
+        return status
+
+    metadata = load_run_metadata(filename)
+    saved_build = metadata.get("simc_build")
+    build = dict(saved_build) if isinstance(saved_build, dict) else {}
+
+    report_build = extract_simc_build(
+        report_text(OUTPUT_DIR / filename),
+        str(metadata.get("simc_version") or ""),
+    )
+    for key, value in report_build.items():
+        build.setdefault(key, value)
+
+    for key in (
+        "version",
+        "wow_version",
+        "wow_channel",
+        "hotfix_date",
+        "hotfix_build",
+        "git_commit",
+    ):
+        status[key] = str(build.get(key) or "")
+
+    image = str(
+        metadata.get("simc_image_resolved")
+        or metadata.get("simc_image")
+        or SIMC_IMAGE
+    )
+    status["image"] = image
+    status["image_source"] = str(metadata.get("simc_image") or SIMC_IMAGE)
+    status["channel_label"] = (
+        "Nightly" if is_nightly_image(str(status["image_source"])) else "Engine"
+    )
+    if "@" in image:
+        digest = image.rsplit("@", 1)[1]
+        status["image_digest"] = digest
+        status["image_digest_short"] = (
+            digest if len(digest) <= 24 else f"{digest[:19]}...{digest[-5:]}"
+        )
+
+    commit = str(status["git_commit"])
+    if commit:
+        status["git_url"] = f"https://github.com/simulationcraft/simc/commit/{commit}"
+
+    status["available"] = bool(status["version"])
+    return status
+
+
 def save_run_metadata(
     output_name: str,
     input_name: str,
@@ -294,8 +442,14 @@ def save_run_metadata(
             }
         )
 
+    output_path = OUTPUT_DIR / output_name
+    simc_build = extract_simc_build(report_text(output_path), process_output)
+    simc_version = detect_simc_version(process_output)
+    if not simc_version and simc_build.get("version"):
+        simc_version = f"SimulationCraft {simc_build['version']}"
+
     metadata = {
-        "schema_version": 1,
+        "schema_version": 2,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "duration_seconds": round(duration_seconds, 3),
         "input_file": input_name,
@@ -303,7 +457,8 @@ def save_run_metadata(
         "simc_image": SIMC_IMAGE,
         "simc_pull_policy": SIMC_PULL_POLICY,
         "simc_image_resolved": resolve_simc_image(),
-        "simc_version": detect_simc_version(process_output),
+        "simc_version": simc_version,
+        "simc_build": simc_build,
         "settings": settings,
     }
 
@@ -341,6 +496,7 @@ def render_error(
 @app.get("/")
 def index():
     reports = list_reports()
+    latest_report = reports[0] if reports else {}
     return render_template(
         "index.html",
         reports=reports,
@@ -349,6 +505,10 @@ def index():
         timeout_minutes=max(1, round(SIMC_TIMEOUT_SECONDS / 60)),
         max_upload_mb=MAX_UPLOAD_MB,
         deleted=request.args.get("deleted") == "1",
+        simc_status=simc_status(
+            str(latest_report.get("filename") or ""),
+            str(latest_report.get("created") or ""),
+        ),
     )
 
 
