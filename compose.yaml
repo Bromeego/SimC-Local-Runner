@@ -7,6 +7,7 @@ services:
     environment:
       TZ: "${TZ:-UTC}"
       SIMC_IMAGE: "${SIMC_IMAGE:-simulationcraftorg/simc:latest}"
+      SIMC_PULL_POLICY: "${SIMC_PULL_POLICY:-always}"
       SIMC_CPUS: "${SIMC_CPUS:-}"
       SIMC_MEMORY: "${SIMC_MEMORY:-}"
       HOST_INPUT_DIR: "${SIMC_WEB_ROOT:?Set SIMC_WEB_ROOT in .env}/input"

@@ -36,6 +36,7 @@ report that is easy to understand and maintain.
 - Saved input profiles and HTML reports
 - Report metadata, manual deletion, and automatic retention
 - Reproducibility metadata with image digest, SimC version, settings, and run time
+- Automatic SimulationCraft image updates before every run
 - Bounded uploads, simulation concurrency, and run time
 - Threaded Gunicorn serving with a container health check
 - Responsive light and dark interface
@@ -125,6 +126,7 @@ The example values live in [`.env.example`](.env.example).
 | `SIMC_WEB_IMAGE` | `ghcr.io/bromeego/simc-local-runner:latest` | Web interface image used by Compose |
 | `TZ` | `UTC` | Container timezone, using an IANA timezone name |
 | `SIMC_IMAGE` | `simulationcraftorg/simc:latest` | SimulationCraft image used for runs |
+| `SIMC_PULL_POLICY` | `always` | Engine image policy: `always`, `missing`, or `never` |
 | `SIMC_CPUS` | Unset | Optional CPU limit passed to each simulation container |
 | `SIMC_MEMORY` | Unset | Optional memory limit such as `4g` |
 | `SIMC_TIMEOUT_SECONDS` | `1800` | Stops a simulation that exceeds this run time |
@@ -135,6 +137,15 @@ The example values live in [`.env.example`](.env.example).
 
 `SIMC_WEB_ROOT` must be a host path, not a path inside the web container. The
 web app passes it to the Docker daemon when launching SimulationCraft.
+
+Before every simulation, the default `always` pull policy asks Docker for the
+current `SIMC_IMAGE`. Docker reuses existing image layers when the registry copy
+has not changed. This keeps `simulationcraftorg/simc:latest` current across game
+patches and model updates without a separate maintenance job.
+
+Use `missing` to pull only when the image is absent, or `never` for a completely
+offline or locally built image. Those modes can continue using a cached engine
+after a newer registry image becomes available.
 
 ## Usage
 
@@ -167,12 +178,12 @@ Pull the latest project and container changes:
 ```sh
 git pull
 docker compose pull simc-web
-docker pull simulationcraftorg/simc:latest
 docker compose up -d
 ```
 
-If `SIMC_IMAGE` is customized, pull that image instead. Existing inputs and
-reports remain in their bind-mounted directories.
+The runner refreshes the configured SimulationCraft engine automatically when
+the next simulation starts. Existing inputs and reports remain in their
+bind-mounted directories.
 
 For a local build, use the two-file command from the Building locally section
 after pulling the latest project changes.
