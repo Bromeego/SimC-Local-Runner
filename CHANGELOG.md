@@ -6,11 +6,18 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-07-17
+
 ### Added
 
 - Show the SimulationCraft nightly used by the latest completed report in an
   accessible header badge, with WoW build, hotfix, source commit, image digest,
   and update-policy details.
+
+### Fixed
+
+- Read current large SimulationCraft reports and labeled nightly build output
+  so the source commit is included in the badge.
 
 ## [0.1.1] - 2026-07-17
 
@@ -51,6 +58,7 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Unique per-run filenames and container names.
 - Documented the Docker socket trust boundary.
 
-[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/Bromeego/SimC-Local-Runner/releases/tag/v0.1.0
