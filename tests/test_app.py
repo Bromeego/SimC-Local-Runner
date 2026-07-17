@@ -99,11 +99,20 @@ class SimcWebTests(unittest.TestCase):
         self.assertEqual(build["hotfix_build"], "68453")
         self.assertEqual(build["git_commit"], "30e0b5f")
 
+    def test_extract_simc_build_from_labeled_console_output(self):
+        build = simc_app.extract_simc_build(
+            "SimulationCraft 1205-01 for World of Warcraft 12.0.7.68453 "
+            "Live (hotfix 2026-07-13/68453, git build midnight 79cea9e)"
+        )
+
+        self.assertEqual(build["git_commit"], "79cea9e")
+
     def test_index_shows_latest_report_build_in_engine_badge(self):
         simc_app.ensure_data_dirs()
         report = simc_app.OUTPUT_DIR / "raid-test.html"
         report.write_text(
-            """
+            "x" * (600 * 1024)
+            + """
             <p>
               <a>SimulationCraft 1205-01</a> for World of Warcraft
               12.0.7.68453 Live (hotfix 2026-07-13/68453,

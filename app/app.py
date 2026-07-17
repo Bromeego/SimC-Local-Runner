@@ -272,7 +272,7 @@ def detect_simc_version(output: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def report_text(path: Path, max_bytes: int = 512 * 1024) -> str:
+def report_text(path: Path, max_bytes: int = 1024 * 1024) -> str:
     """Read enough of a generated report to cover its build header."""
     try:
         with path.open("rb") as report_file:
@@ -328,7 +328,8 @@ def extract_simc_build(*sources: str) -> dict[str, str]:
             build.setdefault("hotfix_build", hotfix_match.group("build"))
 
         commit_match = re.search(
-            r"\bgit build\s+(?P<commit>[0-9a-f]{7,40})\b",
+            r"\bgit build(?:\s+[A-Za-z][A-Za-z0-9._-]*)?\s+"
+            r"(?P<commit>[0-9a-f]{7,40})\b",
             visible,
             re.IGNORECASE,
         )
