@@ -30,6 +30,9 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
+      - name: Run interface tests
+        run: node --test tests/test_app_js.mjs
+
       - name: Validate Compose configuration
         env:
           SIMC_WEB_ROOT: /tmp/simc-web

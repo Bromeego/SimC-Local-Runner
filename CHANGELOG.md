@@ -24,3 +24,8 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Escaped process error output before rendering it in the browser.
 - Unique per-run filenames and container names.
 - Documented the Docker socket trust boundary.
+
+### Fixed
+
+- Reset the transient simulation progress state when returning to the runner
+  with the browser Back button.

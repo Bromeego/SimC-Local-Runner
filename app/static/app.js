@@ -16,6 +16,7 @@
   const runButton = document.getElementById("run-button");
   const runStatus = document.getElementById("run-status");
   const elapsedTime = document.getElementById("elapsed-time");
+  let elapsedTimer = null;
 
   const styleCopy = {
     patchwerk: {
@@ -114,6 +115,28 @@
     profileText.setCustomValidity("");
   });
 
+  function resetRunState() {
+    if (elapsedTimer !== null) {
+      window.clearInterval(elapsedTimer);
+      elapsedTimer = null;
+    }
+
+    runButton.disabled = false;
+    runButton.textContent = "Run simulation";
+    runStatus.hidden = true;
+    elapsedTime.textContent = "0:00 elapsed";
+  }
+
+  // Browsers may restore this page from their back-forward cache exactly as it
+  // looked during submission. Reset transient progress UI whenever it returns.
+  window.addEventListener("pageshow", resetRunState);
+  window.addEventListener("pagehide", function () {
+    if (elapsedTimer !== null) {
+      window.clearInterval(elapsedTimer);
+      elapsedTimer = null;
+    }
+  });
+
   form.addEventListener("submit", function (event) {
     if (!fileInput.files.length && !profileText.value.trim()) {
       event.preventDefault();
@@ -127,7 +150,7 @@
     runStatus.hidden = false;
 
     const startedAt = Date.now();
-    window.setInterval(function () {
+    elapsedTimer = window.setInterval(function () {
       const totalSeconds = Math.floor((Date.now() - startedAt) / 1000);
       const minutes = Math.floor(totalSeconds / 60);
       const seconds = String(totalSeconds % 60).padStart(2, "0");
