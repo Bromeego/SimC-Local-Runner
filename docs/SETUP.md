@@ -1,127 +1,217 @@
-# Setup guide
+# Set up SimC Local Runner
 
-SimC Local Runner can run on a personal computer with Docker Desktop or on a
-trusted homelab server with Docker Engine. The personal-computer setup keeps its
-data in Docker-managed volumes. The homelab setup can instead keep profiles and
-reports in normal host folders for direct backup access.
+Choose the path that matches where the runner will live.
+
+| Setup | Best for | Storage |
+| --- | --- | --- |
+| [Personal computer](#personal-computer) | Windows, macOS, or Linux desktop | Docker-managed volumes |
+| [Homelab with host folders](#homelab-with-host-folders) | A trusted always-on Linux server | `input/` and `output/` on the host |
+
+> [!IMPORTANT]
+> Both setups mount the Docker socket and are intended for a trusted private
+> network. The runner does not include authentication.
 
 ## Personal computer
 
 ### Before you start
 
-Install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-On Windows, make sure Docker Desktop is using Linux containers.
+Install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+or Docker Engine with Compose. On Windows, configure Docker Desktop to use
+Linux containers.
 
-The web interface has native `linux/amd64` and `linux/arm64` images. The
+The SimC Local Runner web image supports `linux/amd64` and `linux/arm64`. The
 official SimulationCraft image is currently `linux/amd64`, so Intel and AMD
-computers provide the best performance. Apple silicon can use Docker's AMD64
-emulation, but simulations may be slower.
+computers deliver native performance. Apple silicon uses Docker's AMD64
+emulation and may run simulations more slowly.
 
-### Download and start
+### Download and launch
 
 1. Open the [latest release](https://github.com/Bromeego/SimC-Local-Runner/releases/latest).
 2. Download **Source code (zip)** and extract it to a permanent folder.
 3. Start the runner:
 
-   - Windows: double-click `start.cmd`.
-   - macOS: open Terminal in the extracted folder and run `sh start.sh`.
-   - Linux desktop: run `sh start.sh`.
+   | Platform | Action |
+   | --- | --- |
+   | Windows | Double-click `start.cmd` |
+   | macOS | Open Terminal in the folder and run `sh start.sh` |
+   | Linux desktop | Run `sh start.sh` |
 
 4. Open <http://localhost:8088> if it does not open automatically.
 
-The launcher checks that Docker is running, downloads the newest web image, and
+The launcher confirms Docker is available, downloads the newest web image, and
 starts the app. Docker creates persistent volumes for profiles and reports. A
 normal stop, restart, update, or `docker compose down` keeps those volumes.
 
-### Stop and update
+### Stop
 
 Stop the runner without deleting saved data:
 
-```sh
+```bash
 docker compose down
 ```
 
-Run the launcher again whenever you want to start or update the app. To update
-manually, run:
+> [!CAUTION]
+> Do not add `--volumes` unless you intentionally want to delete every saved
+> profile and report in the managed volumes.
 
-```sh
+### Update
+
+Run the launcher again, or update manually:
+
+```bash
 docker compose pull simc-web
 docker compose up -d
 ```
 
-Do not add `--volumes` to `docker compose down` unless you intentionally want
-to delete every saved profile and report.
+The web image updates immediately. The configured SimulationCraft engine is
+checked according to `SIMC_PULL_POLICY` when the next simulation begins.
 
 ## Homelab with host folders
 
-The default Docker-managed volumes are also suitable for a homelab. Use this
-mode when you prefer profiles and reports under a known host path such as
-`/srv/simc-web`.
+The default managed volumes also work on a homelab. Use this optional mode when
+you need profiles and reports in a known host path for direct backup access.
+The example below uses `/srv/simc-web`.
 
-1. Clone the repository into the permanent deployment directory:
+### 1. Prepare the deployment folder
 
-   ```sh
-   sudo mkdir -p /srv/simc-web
-   sudo chown "$USER":"$USER" /srv/simc-web
-   git clone https://github.com/Bromeego/SimC-Local-Runner.git /srv/simc-web
-   cd /srv/simc-web
-   mkdir -p input output
-   ```
+```bash
+sudo mkdir -p /srv/simc-web
+sudo chown "$USER":"$USER" /srv/simc-web
+git clone https://github.com/Bromeego/SimC-Local-Runner.git /srv/simc-web
+cd /srv/simc-web
+mkdir -p input output
+```
 
-2. Create `.env` from the example and set these homelab values:
+### 2. Enable bind-folder storage
 
-   ```sh
-   cp .env.example .env
-   ```
+Copy the environment example:
 
-   ```dotenv
-   COMPOSE_FILE=compose.yaml:compose.bind.yaml
-   SIMC_WEB_ROOT=/srv/simc-web
-   ```
+```bash
+cp .env.example .env
+```
 
-3. Start the runner:
+Add or uncomment:
 
-   ```sh
-   docker compose pull simc-web
-   docker compose up -d
-   ```
+```dotenv
+COMPOSE_FILE=compose.yaml:compose.bind.yaml
+SIMC_WEB_ROOT=/srv/simc-web
+```
 
-4. Open `http://SERVER-IP:8088` from another device on the trusted network.
+`SIMC_WEB_ROOT` must be an absolute path containing the `input/` and `output/`
+folders.
 
-The bind-folder override replaces the two Docker-managed data volumes. The app
-discovers the resolved Docker mounts automatically and gives the same storage
-to each temporary SimulationCraft container.
+### 3. Start the runner
 
-For a different port, timezone, resource limit, or retention count, copy the
-corresponding value from [`.env.example`](../.env.example) into `.env` and edit
-it. Keep the deployment on a trusted network. If remote access is required, put
-it behind a reverse proxy with TLS and authentication.
+```bash
+docker compose pull simc-web
+docker compose up -d
+```
+
+### 4. Open it on the private network
+
+Visit `http://SERVER-IP:8088` from another trusted device.
+
+The bind override replaces the two managed data volumes. The app discovers the
+resolved mounts and gives the same storage to every temporary SimulationCraft
+container.
+
+> [!TIP]
+> To change the port, timezone, resource limits, or retention count, copy the
+> corresponding setting from [`.env.example`](../.env.example) into `.env`.
+
+## Build from source
+
+To run the web app from the current checkout instead of the published image:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+For source builds with bind-folder storage:
+
+```bash
+SIMC_WEB_ROOT=/srv/simc-web docker compose \
+  -f compose.yaml \
+  -f compose.bind.yaml \
+  -f compose.build.yaml \
+  up -d --build
+```
 
 ## Troubleshooting
 
 ### Docker is unavailable
 
-Confirm Docker Desktop or Docker Engine is running:
+Confirm that Docker Desktop or Docker Engine is running:
 
-```sh
+```bash
 docker info
 docker compose version
 ```
 
+If either command fails, resolve Docker access before starting the runner.
+
 ### The page does not open
 
-Check the container and recent logs:
+Check the container state and recent logs:
 
-```sh
+```bash
 docker compose ps
 docker compose logs --tail=100 simc-web
 ```
 
-The default address is <http://localhost:8088>. A homelab is reached through
-the server's hostname or LAN IP instead of `localhost`.
+The desktop address is <http://localhost:8088>. On a homelab, use the server's
+hostname or LAN IP rather than `localhost`.
+
+If another service already uses port `8088`, set a different host port in
+`.env`:
+
+```dotenv
+SIMC_WEB_PORT=8090
+```
+
+Then recreate the service with `docker compose up -d`.
 
 ### A simulation cannot access its input or output
 
-The web container must have `/data/input`, `/data/output`, and
-`/var/run/docker.sock` mounted. Recreate the deployment from the supplied
-Compose files rather than starting the image directly without those mounts.
+The web container needs all three mounts:
+
+- `/data/input`
+- `/data/output`
+- `/var/run/docker.sock`
+
+Recreate the deployment from the supplied Compose files instead of starting the
+image directly without its mounts.
+
+In bind-folder mode, also confirm that:
+
+- `SIMC_WEB_ROOT` is an absolute path;
+- `input/` and `output/` exist beneath it; and
+- the Docker daemon can read and write both folders.
+
+### The SimulationCraft image will not pull
+
+Pull the engine directly to see the registry or platform error:
+
+```bash
+docker pull simulationcraftorg/simc:latest
+```
+
+If the host must run offline, pull the image in advance and set:
+
+```dotenv
+SIMC_PULL_POLICY=never
+```
+
+### The runner is slow on Apple silicon
+
+The web interface runs natively on ARM64, but the current official
+SimulationCraft image runs through AMD64 emulation. Lowering iterations can
+shorten a test run; use an x86-64 host when native simulation performance is
+important.
+
+## Next steps
+
+- Review all optional settings in [`.env.example`](../.env.example).
+- Read the [storage and privacy notes](../README.md#storage-and-privacy).
+- Keep the deployment inside the boundary described in
+  [`SECURITY.md`](../SECURITY.md).

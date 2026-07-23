@@ -1,56 +1,97 @@
-# Contributing to simc-web
+# Contributing to SimC Local Runner
 
-Thanks for helping make local SimulationCraft runs easier to use.
+Thanks for helping make local SimulationCraft runs easier to operate and easier
+to trust.
 
-## Before opening a change
+> [!NOTE]
+> The project is deliberately narrow: a small, Docker-first runner from profile
+> to official HTML report. Changes should strengthen that path rather than turn
+> the app into a hosted optimization service.
 
-- Search existing issues first.
-- Keep the app focused: a small Docker-first runner rather than a replacement
-  for full gear-optimization services.
-- Open an issue before making a large interface or architecture change.
-- Never include exported character profiles, generated reports, credentials,
-  host paths, or other personal data in a commit.
+## Before you begin
 
-## Local setup
+- Search existing issues and pull requests.
+- Open an issue before a large interface or architecture change.
+- Keep changes focused on one user-facing problem.
+- Never commit exported character profiles, generated reports, credentials,
+  host paths, image digests tied to a private registry, or other personal data.
+- Read [`DESIGN.md`](DESIGN.md) before changing the interface.
 
-1. Install Python 3.12 or newer.
-2. Install the application dependencies:
+## Development setup
 
-   ```sh
-   python -m pip install -r app/requirements.txt
-   ```
+### 1. Prepare Python
 
-3. Run the tests:
+Use Python 3.12 or newer, preferably in a virtual environment:
 
-   ```sh
-   python -m unittest discover -s tests -v
-   ```
+```bash
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r app/requirements.txt
+```
 
-4. Validate the Compose configuration:
+On Windows PowerShell, activate the environment with
+`.venv\Scripts\Activate.ps1`.
 
-   ```sh
-   SIMC_WEB_ROOT=/tmp/simc-web docker compose config --quiet
-   ```
+### 2. Run the checks
 
-5. Build the web image:
+```bash
+python -m unittest discover -s tests -v
+docker compose config --quiet
+docker compose -f compose.yaml -f compose.build.yaml config --quiet
+docker build -t simc-web:test app
+```
 
-   ```sh
-   docker build -t simc-web:test app
-   ```
+Validate the optional bind-folder deployment separately:
 
-For an end-to-end check against the official SimulationCraft image, run
-`tests/smoke-test.sh` on a Linux Docker host.
+```bash
+SIMC_WEB_ROOT=/tmp/simc-web docker compose \
+  -f compose.yaml -f compose.bind.yaml config --quiet
+```
 
-## Pull requests
+### 3. Exercise the real engine
 
-- Keep pull requests small and explain the user-facing reason for the change.
-- Add or update tests when behavior changes.
-- Update `README.md` and `CHANGELOG.md` for visible features or configuration.
-- Include screenshots for meaningful interface changes, in both themes when
-  the change affects them.
-- Confirm that all automated checks pass.
+On a Linux Docker host, run:
 
-## Reporting security problems
+```bash
+sh tests/smoke-test.sh
+```
 
-Please do not open a public issue for a vulnerability. Follow
-[`SECURITY.md`](SECURITY.md) instead.
+This uses the anonymous [`examples/demo.simc`](examples/demo.simc) profile
+against the official SimulationCraft image.
+
+## What to test
+
+| Change | Minimum evidence |
+| --- | --- |
+| Python behavior | Add or update a unit test |
+| Browser behavior | Update the JavaScript test where practical |
+| Compose or environment settings | Validate every affected Compose combination |
+| Interface layout or color | Check narrow and wide screens in both themes |
+| User-visible behavior | Update `README.md` and `CHANGELOG.md` |
+| Meaningful interface change | Include light and dark screenshots |
+
+## Pull request checklist
+
+- [ ] The pull request explains the user-facing reason for the change.
+- [ ] The change stays small enough to review as one unit.
+- [ ] Tests cover new or changed behavior.
+- [ ] Compose configurations still validate.
+- [ ] Documentation and changelog entries are current.
+- [ ] Screenshots, logs, profiles, and reports contain no personal information.
+- [ ] Both themes and keyboard focus states were checked for UI changes.
+- [ ] Automated checks pass.
+
+## Design changes
+
+Preserve the interface's local-workbench character: warm paper in light mode,
+charcoal in dark mode, ember-orange for decisive actions, monospace for
+technical detail, and restrained motion. Use existing tokens and patterns
+before adding new ones.
+
+The complete palette, type hierarchy, component rules, responsive behavior, and
+design anti-patterns live in [`DESIGN.md`](DESIGN.md).
+
+## Security reports
+
+Do not open a public issue for a vulnerability. Follow the private reporting
+process in [`SECURITY.md`](SECURITY.md).

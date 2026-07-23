@@ -1,47 +1,106 @@
-# SimC Local Runner
+<p align="center">
+  <img src="app/static/favicon.svg" alt="" width="72" height="72">
+</p>
 
-[![CI](https://github.com/Bromeego/SimC-Local-Runner/actions/workflows/ci.yml/badge.svg)](https://github.com/Bromeego/SimC-Local-Runner/actions/workflows/ci.yml)
-[![MIT License](https://img.shields.io/badge/license-MIT-c75b2a.svg)](LICENSE)
+<h1 align="center">SimC Local Runner</h1>
 
-A lightweight, self-hosted web interface for running
-[SimulationCraft](https://www.simulationcraft.org/) profiles from a browser.
+<p align="center">
+  Profile in. Official SimulationCraft report out.<br>
+  A private, Docker-first runner for your browser.
+</p>
 
-Upload a `.simc` or `.txt` profile (or paste one into the page), choose a fight
-style and a few common settings, and the app runs the official SimulationCraft
-Docker image. The generated HTML reports remain available from the home page.
+<p align="center">
+  <a href="https://github.com/Bromeego/SimC-Local-Runner/actions/workflows/ci.yml"><img src="https://github.com/Bromeego/SimC-Local-Runner/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-c75b2a.svg" alt="MIT License"></a>
+</p>
+
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="docs/SETUP.md">Setup guide</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
+</p>
+
+---
+
+SimC Local Runner turns a `.simc` or `.txt` profile into an official
+[SimulationCraft](https://www.simulationcraft.org/) HTML report. Upload or
+paste a profile, tune the encounter, and keep the result in a local report
+archive—without an account, database, external API key, or subscription.
+
+> [!IMPORTANT]
+> This app is designed for a trusted personal computer or private homelab. It
+> mounts the Docker socket and does not include authentication. Do not expose it
+> directly to the public internet.
 
 ## Preview
 
 <p align="center">
-  <img src="docs/screenshots/simc-web-dark.png" alt="SimulationCraft local runner in dark theme" width="49%">
-  <img src="docs/screenshots/simc-web-light.png" alt="SimulationCraft local runner in light theme" width="49%">
+  <img src="docs/screenshots/simc-web-dark.png" alt="SimC Local Runner in dark theme" width="49%">
+  <img src="docs/screenshots/simc-web-light.png" alt="SimC Local Runner in light theme" width="49%">
 </p>
 
-## Why this project?
+## What it does
 
-SimC Local Runner is the small, Docker-first option: no accounts, database,
-external API keys, subscription, or multi-service stack. It is intended for a
-trusted home server where you want to paste or drop in a profile and get the
-official SimulationCraft HTML report back.
+| Run | Preserve | Operate |
+| --- | --- | --- |
+| Upload, drop, or paste a profile | Save inputs and HTML reports | Start with one Compose command |
+| Choose Patchwerk, HecticAddCleave, or DungeonSlice | Record image digest, SimC version, settings, and run time | Update the SimC engine automatically |
+| Set iterations, targets, and fight time | Retain a bounded report history | Limit uploads, concurrency, resources, and run time |
+| Use the official SimulationCraft container | Delete reports and matching inputs together | Serve a responsive light and dark interface |
 
-It deliberately does not try to replace full optimization tools such as
-Raidbots or larger local suites. The focus is a polished path from profile to
-report that is easy to understand and maintain.
+The project stays intentionally small. It is a polished local path from profile
+to report, not a replacement for Raidbots or a full optimization suite.
 
-## Features
+## Quick start
 
-- Click, drag and drop, or paste a SimulationCraft profile
-- Patchwerk, HecticAddCleave, and DungeonSlice fight styles
-- Controls for iterations, desired targets, and maximum fight time
-- Saved input profiles and HTML reports
-- Report metadata, manual deletion, and automatic retention
-- Reproducibility metadata with image digest, SimC version, settings, and run time
-- Compact nightly-build badge with WoW, hotfix, source commit, and image details
-- Automatic SimulationCraft image updates before every run
-- Bounded uploads, simulation concurrency, and run time
-- Threaded Gunicorn serving with a container health check
-- Responsive light and dark interface
-- Simple Docker Compose deployment
+### 1. Download
+
+Open the [latest release](https://github.com/Bromeego/SimC-Local-Runner/releases/latest),
+download **Source code (zip)**, and extract it to a permanent folder.
+
+### 2. Launch
+
+| Platform | Start the runner |
+| --- | --- |
+| Windows | Double-click `start.cmd` |
+| macOS | Open Terminal in the folder and run `sh start.sh` |
+| Linux | Run `sh start.sh` |
+
+The launcher checks Docker, pulls the current web image, and starts the app. No
+`.env` file or storage path is required.
+
+### 3. Open
+
+Visit <http://localhost:8088>.
+
+For a manual start:
+
+```bash
+docker compose pull simc-web
+docker compose up -d
+```
+
+> [!TIP]
+> The [setup guide](docs/SETUP.md) covers Docker Desktop, homelab bind folders,
+> platform notes, updates, and more detailed troubleshooting.
+
+## How a run works
+
+1. The runner accepts an uploaded or pasted profile.
+2. Your form settings replace matching `fight_style`, `iterations`,
+   `desired_targets`, and `max_time` values in that profile.
+3. A temporary container runs the configured official SimulationCraft image.
+4. The input, HTML report, and reproducibility metadata are saved locally.
+
+If both an upload and pasted text are present, the uploaded file wins.
+DungeonSlice manages its own target flow and timing, so the runner does not add
+`desired_targets` or `max_time` for that fight style.
+
+The header badge describes the SimC nightly used by the latest completed run.
+Open it to see the matching WoW build, hotfix, upstream commit, image source,
+and container digest.
 
 ## Requirements
 
@@ -49,250 +108,201 @@ report that is easy to understand and maintain.
 - Linux container support and permission to access the Docker socket
 - An x86-64 computer for native SimulationCraft performance
 
-The app runs a second container for each simulation. It therefore mounts the
-host Docker socket. Keep it on a trusted personal computer or homelab network.
-Apple silicon can run the current x86-64 SimulationCraft image through Docker
-emulation, but simulations may be slower.
-
-## Quick start
-
-1. Open the [latest release](https://github.com/Bromeego/SimC-Local-Runner/releases/latest),
-   download **Source code (zip)**, and extract it to a permanent folder.
-
-2. Start the runner:
-
-   - Windows: double-click `start.cmd`.
-   - macOS: open Terminal in the folder and run `sh start.sh`.
-   - Linux: run `sh start.sh`.
-
-3. Open <http://localhost:8088>.
-
-The launcher checks Docker, pulls the current image, and starts the app. No
-`.env` file or storage path is required. For a manual start, use:
-
-```sh
-docker compose pull simc-web
-docker compose up -d
-```
-
-See the [setup guide](docs/SETUP.md) for homelab bind folders, updates,
-platform notes, and troubleshooting.
-
-View logs with:
-
-```sh
-docker compose logs -f simc-web
-```
-
-Stop the app with:
-
-```sh
-docker compose down
-```
-
-### Building locally
-
-The default Compose file uses the published image from GitHub Container
-Registry. To build the web app from this checkout instead, add the local-build
-override:
-
-```sh
-docker compose -f compose.yaml -f compose.build.yaml up -d --build
-```
-
-Remove the override when you want to return to the published image. Release
-tags such as `v0.1.0` also produce matching container image tags, which can be
-set with `SIMC_WEB_IMAGE` when you prefer to pin a version.
+The web image supports `linux/amd64` and `linux/arm64`. The official
+SimulationCraft image is currently x86-64; Apple silicon can run it through
+Docker emulation, but simulations may be slower.
 
 ## Configuration
 
-The example values live in [`.env.example`](.env.example).
+The defaults work without a `.env` file. Copy [`.env.example`](.env.example)
+to `.env` only when you want to override them.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `SIMC_WEB_PORT` | `8088` | Port exposed by the web app |
+| `SIMC_WEB_PORT` | `8088` | Host port for the web app |
 | `SIMC_WEB_IMAGE` | `ghcr.io/bromeego/simc-local-runner:latest` | Web interface image used by Compose |
-| `TZ` | `UTC` | Container timezone, using an IANA timezone name |
+| `TZ` | `UTC` | Container timezone as an IANA name |
 | `SIMC_IMAGE` | `simulationcraftorg/simc:latest` | SimulationCraft image used for runs |
 | `SIMC_PULL_POLICY` | `always` | Engine image policy: `always`, `missing`, or `never` |
-| `SIMC_CPUS` | Unset | Optional CPU limit passed to each simulation container |
-| `SIMC_MEMORY` | Unset | Optional memory limit such as `4g` |
-| `SIMC_TIMEOUT_SECONDS` | `1800` | Stops a simulation that exceeds this run time |
-| `MAX_UPLOAD_MB` | `2` | Maximum request and profile upload size |
+| `SIMC_CPUS` | unset | Optional CPU limit for each simulation |
+| `SIMC_MEMORY` | unset | Optional memory limit such as `4g` |
+| `SIMC_TIMEOUT_SECONDS` | `1800` | Maximum run time before a simulation is stopped |
+| `MAX_UPLOAD_MB` | `2` | Maximum request and profile size |
 | `MAX_CONCURRENT_SIMS` | `1` | Simulation jobs accepted at once |
-| `REPORT_RETENTION_COUNT` | `100` | Reports retained after a successful run |
-| `WEB_THREADS` | `4` | Web threads for pages and long-running requests |
+| `REPORT_RETENTION_COUNT` | `100` | Successful reports retained |
+| `WEB_THREADS` | `4` | Threads serving pages and long-running requests |
+
+### Engine update policy
+
+With the default `always` policy, Docker checks `SIMC_IMAGE` before every run
+and reuses unchanged image layers. This keeps the nightly current across game
+patches and model updates.
+
+- `always` checks the registry before every run.
+- `missing` pulls only when the image is not already cached.
+- `never` uses an offline or locally built image without pulling.
+
+## Storage and privacy
 
 The default deployment stores profiles and reports in Docker-managed volumes.
-The optional homelab bind-folder mode uses `SIMC_WEB_ROOT`; see the
-[setup guide](docs/SETUP.md).
+The optional homelab mode stores them in `input/` and `output/` beneath
+`SIMC_WEB_ROOT`; see [Homelab with host folders](docs/SETUP.md#homelab-with-host-folders).
 
-Before every simulation, the default `always` pull policy asks Docker for the
-current `SIMC_IMAGE`. Docker reuses existing image layers when the registry copy
-has not changed. This keeps `simulationcraftorg/simc:latest` current across game
-patches and model updates without a separate maintenance job.
+Every successful report gets a matching `.json` metadata file. It records the
+resolved image digest when available, the SimC version, selected settings, UTC
+creation time, and wall-clock run duration.
 
-Use `missing` to pull only when the image is absent, or `never` for a completely
-offline or locally built image. Those modes can continue using a cached engine
-after a newer registry image becomes available.
+Profiles and reports may contain character information. Back them up and share
+them with the same care as any other personal data. When a report is deleted in
+the interface, its matching saved input is deleted too. Retention cleanup
+removes the oldest report/input pair after a successful run.
 
-## Usage
+## Everyday commands
 
-Export a profile from SimulationCraft or an addon that produces SimulationCraft
-input, then upload the file or paste its contents into the page. If both are
-provided, the uploaded file takes precedence.
+View logs:
 
-The values chosen in the web interface replace any existing `fight_style`,
-`iterations`, `desired_targets`, and `max_time` settings in the submitted
-profile. DungeonSlice uses its own target flow and timing, so `desired_targets`
-and `max_time` are not added for that fight style.
+```bash
+docker compose logs -f simc-web
+```
 
-Generated inputs and reports are stored in persistent Docker volumes by
-default. The homelab bind-folder mode stores them in `input/` and `output/`
-under `SIMC_WEB_ROOT`. Profiles and reports can contain character information
-and can grow over time.
+Stop the app without deleting saved data:
 
-Each successful report also gets a matching `.json` metadata file in `output/`.
-It records the exact SimulationCraft image digest when Docker exposes one, the
-version line reported by SimC, chosen settings, UTC creation time, and wall-clock
-run duration. This makes it much easier to reproduce or explain an older result.
+```bash
+docker compose down
+```
 
-The header badge shows the SimulationCraft nightly used by the latest completed
-report. Hover over it, focus it with the keyboard, or select it on a touch device
-to see the matching WoW build, hotfix, upstream commit, and container digest. The
-update note in the same panel reflects the configured `SIMC_PULL_POLICY`.
+Update and restart:
 
-Deleting a report from the interface also deletes its matching saved input.
-After each successful run, the oldest report and matching input are removed when
-the configured retention count is exceeded.
-
-## Updating
-
-Run `start.cmd` or `start.sh` again, or update manually:
-
-```sh
+```bash
 docker compose pull simc-web
 docker compose up -d
 ```
 
-The runner refreshes the configured SimulationCraft engine automatically when
-the next simulation starts. Existing Docker volumes or homelab folders remain
-in place.
+> [!CAUTION]
+> Do not add `--volumes` to `docker compose down` unless you intend to delete
+> every profile and report stored in the managed volumes.
 
-For a local build, use the two-file command from the Building locally section
-after pulling the latest project changes.
+## Build from this checkout
 
-## Project layout
+The default Compose file pulls the published image. Add the build override to
+run the source in your current checkout:
+
+```bash
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+Remove the override to return to the published image. Release tags such as
+`v0.3.0` also publish matching container tags; set `SIMC_WEB_IMAGE` if you want
+to pin one.
+
+## Project map
 
 ```text
 .
-|-- app/
-|   |-- app.py
-|   |-- Dockerfile
-|   |-- gunicorn.conf.py
-|   |-- static/
-|   |-- templates/
-|   `-- requirements.txt
-|-- input/                 # Submitted profiles (generated, not committed)
-|-- output/                # HTML reports (generated, not committed)
-|-- docs/screenshots/      # README previews
-|-- docs/SETUP.md          # Personal computer and homelab setup
-|-- examples/demo.simc     # Anonymous profile for smoke testing
-|-- tests/
-|-- .github/               # Checks, image publishing, and issue templates
-|-- CHANGELOG.md
-|-- CONTRIBUTING.md
-|-- LICENSE
-|-- SECURITY.md
-|-- .env.example
-|-- compose.bind.yaml      # Optional homelab bind-folder storage
-|-- compose.build.yaml     # Local source-build override
-|-- start.cmd              # Windows launcher
-|-- start.sh               # macOS and Linux launcher
-`-- compose.yaml           # Published-image deployment
+├── app/                     # Flask app, templates, static assets, container
+├── docs/
+│   ├── screenshots/         # README previews
+│   └── SETUP.md             # Desktop and homelab setup
+├── examples/demo.simc       # Anonymous smoke-test profile
+├── tests/                   # Unit, browser, and engine checks
+├── compose.yaml             # Published-image deployment
+├── compose.bind.yaml        # Optional host-folder storage
+├── compose.build.yaml       # Local source-build override
+├── start.cmd                # Windows launcher
+└── start.sh                 # macOS and Linux launcher
 ```
+
+See [`DESIGN.md`](DESIGN.md) for the interface design system and agent
+guardrails.
 
 ## Troubleshooting
 
-### Docker socket permission errors
+### Docker socket permission error
 
-The web container must be able to use `/var/run/docker.sock`. Confirm Docker is
-running and that the socket is mounted as shown in `compose.yaml`.
+Confirm Docker is running and `/var/run/docker.sock` is mounted as shown in
+`compose.yaml`. On Linux, the account running Compose must be allowed to use
+Docker.
 
-### Simulation starts but no report appears
+### The page does not open
 
-Check the app logs for a Docker storage error. The web container must have
-`/data/input`, `/data/output`, and `/var/run/docker.sock` mounted. In homelab
-bind-folder mode, also confirm `SIMC_WEB_ROOT` exists and is writable.
+Check the service and its recent logs:
 
-### SimulationCraft image cannot be pulled
+```bash
+docker compose ps
+docker compose logs --tail=100 simc-web
+```
 
-Pull it directly to see the underlying Docker error:
+The desktop address is <http://localhost:8088>. For a homelab, use the server's
+hostname or LAN IP.
 
-```sh
+### A simulation starts but no report appears
+
+Check the logs for a Docker storage error. The web container must have
+`/data/input`, `/data/output`, and `/var/run/docker.sock` mounted. In bind-folder
+mode, `SIMC_WEB_ROOT` must exist and be writable.
+
+### The SimulationCraft image cannot be pulled
+
+Pull it directly to reveal the underlying Docker error:
+
+```bash
 docker pull simulationcraftorg/simc:latest
 ```
 
-## Security
+More fixes are collected in the [setup guide](docs/SETUP.md#troubleshooting).
 
-This is currently a trusted-network/homelab app. It has no authentication,
-rate limiting, or per-user isolation. It also mounts the Docker socket, which is
-a highly privileged host capability.
+## Development
 
-Do not expose the app directly to the public internet. If remote access is
-needed, place it behind a reverse proxy with TLS and authentication, restrict
-network access, and keep Docker and the images up to date.
+Install the application dependencies and run the test suite:
 
-## Development checks
-
-Install the app requirements, then run the standard-library test suite:
-
-```sh
+```bash
 .venv/bin/python -m pip install -r app/requirements.txt
 .venv/bin/python -m unittest discover -s tests -v
 ```
 
-Validate the deployment and build the web image with:
+Validate Compose and build the web image:
 
-```sh
+```bash
 docker compose config --quiet
 docker compose -f compose.yaml -f compose.build.yaml config --quiet
-SIMC_WEB_ROOT=/tmp/simc-web docker compose -f compose.yaml -f compose.bind.yaml config --quiet
+SIMC_WEB_ROOT=/tmp/simc-web docker compose \
+  -f compose.yaml -f compose.bind.yaml config --quiet
 docker build -t simc-web:test app
 ```
 
-Run the real engine smoke test with:
+Run an end-to-end check against the real engine:
 
-```sh
+```bash
 sh tests/smoke-test.sh
 ```
 
-GitHub Actions runs the unit, Compose, and image-build checks for every pull
-request. A separate scheduled workflow runs the anonymous demo profile against
-the latest official SimulationCraft image each week.
+GitHub Actions runs unit, Compose, and image-build checks on every pull request.
+A scheduled workflow runs the anonymous demo profile against the latest
+official SimulationCraft image each week.
 
-## Contributing
+## Contributing and security
 
-Issues and focused pull requests are welcome. Please read
-[`CONTRIBUTING.md`](CONTRIBUTING.md), especially the note about removing
-character and host information from profiles, reports, screenshots, and logs.
-Security problems should be reported privately as described in
-[`SECURITY.md`](SECURITY.md).
+Focused issues and pull requests are welcome. Read
+[`CONTRIBUTING.md`](CONTRIBUTING.md) before making a change, especially the
+rules for removing character and host information from profiles, reports,
+screenshots, and logs.
+
+Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md).
 
 ## Upstream projects and trademarks
 
-This project is a web runner for the official
-[`simulationcraft/simc`](https://github.com/simulationcraft/simc) engine and its
-[`simulationcraftorg/simc`](https://hub.docker.com/r/simulationcraftorg/simc)
+This project runs the official
+[`simulationcraft/simc`](https://github.com/simulationcraft/simc) engine through
+its [`simulationcraftorg/simc`](https://hub.docker.com/r/simulationcraftorg/simc)
 container image. SimulationCraft's contributors deserve the credit for the
 simulator and its maintained class models.
 
 SimC Local Runner is an independent community project. It is not affiliated
-with or endorsed by the SimulationCraft project, Raidbots, or Blizzard
-Entertainment. World of Warcraft and Blizzard Entertainment are trademarks or
-registered trademarks of Blizzard Entertainment, Inc.
+with or endorsed by SimulationCraft, Raidbots, or Blizzard Entertainment.
+World of Warcraft and Blizzard Entertainment are trademarks or registered
+trademarks of Blizzard Entertainment, Inc.
 
 ## License
 
-The simc-web source code is available under the [MIT License](LICENSE). The
-SimulationCraft engine and other upstream components retain their own licenses.
+SimC Local Runner is available under the [MIT License](LICENSE). SimulationCraft
+and other upstream components retain their own licenses.
