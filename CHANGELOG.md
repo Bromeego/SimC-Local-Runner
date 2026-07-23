@@ -1,37 +1,45 @@
 # Changelog
 
-All notable changes to this project will be documented in this file. The format
-is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this
-project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+Notable changes to SimC Local Runner are recorded here.
+
+This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates use
+`YYYY-MM-DD`.
 
 ## [Unreleased]
+
+### Changed
+
+- Refresh the project documentation and add a project-specific `DESIGN.md` for
+  consistent interface work.
 
 ## [0.3.0] - 2026-07-17
 
 ### Added
 
-- Add Windows and macOS/Linux launchers, a desktop-focused setup guide, and an
-  optional bind-folder Compose overlay for homelab deployments.
+- Windows and macOS/Linux launchers.
+- A desktop-focused setup guide.
+- An optional bind-folder Compose overlay for homelab deployments.
 
 ### Changed
 
-- Use persistent Docker-managed volumes by default with no required `.env`
-  file or absolute host path.
+- Store data in persistent Docker-managed volumes by default, with no required
+  `.env` file or absolute host path.
 - Discover the web container's Docker mounts automatically so SimulationCraft
-  jobs can share either named volumes or homelab bind folders.
+  jobs can share either managed volumes or homelab bind folders.
 
 ## [0.2.0] - 2026-07-17
 
 ### Added
 
-- Show the SimulationCraft nightly used by the latest completed report in an
-  accessible header badge, with WoW build, hotfix, source commit, image digest,
-  and update-policy details.
+- An accessible header badge showing the SimulationCraft nightly used by the
+  latest completed report, including its WoW build, hotfix, source commit,
+  image digest, and update policy.
 
 ### Fixed
 
-- Read current large SimulationCraft reports and labeled nightly build output
-  so the source commit is included in the badge.
+- Read current large SimulationCraft reports and labeled nightly-build output
+  so the source commit appears in the badge.
 
 ## [0.1.1] - 2026-07-17
 
@@ -45,32 +53,32 @@ project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Drag-and-drop `.simc` and `.txt` profile uploads.
-- Responsive light and dark interface.
+- A responsive light and dark interface.
 - Patchwerk, HecticAddCleave, and DungeonSlice controls.
-- Saved report list with deletion and automatic retention.
+- A saved report list with deletion and automatic retention.
 - Per-run timeout, concurrency, upload, CPU, and memory limits.
-- Health check and threaded Gunicorn server.
-- Reproducibility metadata beside each report, including the configured image,
-  resolved digest, SimulationCraft version, settings, and run duration.
+- A health check and threaded Gunicorn server.
+- Reproducibility metadata containing the configured image, resolved digest,
+  SimulationCraft version, settings, and run duration.
 - Automated unit, Compose, container-build, and SimulationCraft smoke checks.
-- Docker image publishing workflow for GitHub Container Registry.
+- Docker image publishing through GitHub Container Registry.
 - A compact SimulationCraft favicon matching the web interface.
 
 ### Changed
 
-- The default Compose deployment now pulls the published GHCR image, with a
-  separate override available for local builds.
+- Pull the published GHCR image in the default Compose deployment, with a
+  separate override for local builds.
 
 ### Fixed
 
-- Reset the transient simulation progress state when returning to the runner
-  with the browser Back button.
+- Reset transient simulation progress when returning to the runner with the
+  browser Back button.
 
 ### Security
 
-- Escaped process error output before rendering it in the browser.
-- Unique per-run filenames and container names.
-- Documented the Docker socket trust boundary.
+- Escape process error output before rendering it in the browser.
+- Use unique filenames and container names for every run.
+- Document the Docker socket trust boundary.
 
 [Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.2.0...v0.3.0
