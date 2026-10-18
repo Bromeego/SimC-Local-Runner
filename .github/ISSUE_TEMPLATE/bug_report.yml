@@ -12,7 +12,7 @@ body:
     attributes:
       label: simc-web version
       description: Release tag, container tag, or commit if known.
-      placeholder: v0.1.0
+      placeholder: v0.3.1
     validations:
       required: true
   - type: input

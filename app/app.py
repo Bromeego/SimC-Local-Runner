@@ -6,7 +6,7 @@ import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from threading import BoundedSemaphore
+from threading import BoundedSemaphore, Lock
 from uuid import uuid4
 
 from flask import (
@@ -36,6 +36,7 @@ def env_choice(name: str, default: str, choices: set[str]) -> str:
 
 
 app = Flask(__name__)
+APP_VERSION = "0.3.1"
 
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/data/output"))
@@ -56,8 +57,18 @@ MAX_UPLOAD_MB = env_int("MAX_UPLOAD_MB", 2)
 MAX_CONCURRENT_SIMS = env_int("MAX_CONCURRENT_SIMS", 1)
 REPORT_RETENTION_COUNT = env_int("REPORT_RETENTION_COUNT", 100)
 
-app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+def profile_byte_limit() -> int:
+    return MAX_UPLOAD_MB * 1024 * 1024
+
+
+# A request can carry both an uploaded file and pasted text. Allow both copies
+# of a profile at the advertised limit, plus multipart framing. Flask's default
+# form-memory cap is 500 KB, which would reject a valid pasted profile first.
+app.config["MAX_CONTENT_LENGTH"] = profile_byte_limit() * 2 + 1024 * 1024
+app.config["MAX_FORM_MEMORY_SIZE"] = profile_byte_limit()
 SIMULATION_SLOTS = BoundedSemaphore(MAX_CONCURRENT_SIMS)
+ACTIVE_RUN_CONTAINERS: set[str] = set()
+ACTIVE_RUN_LOCK = Lock()
 
 ALLOWED_EXTENSIONS = {".simc", ".txt"}
 FIGHT_STYLES = {
@@ -276,12 +287,21 @@ def report_details(path: Path) -> dict[str, str]:
 
 def list_reports() -> list[dict[str, str]]:
     ensure_data_dirs()
-    paths = sorted(
-        OUTPUT_DIR.glob("*.html"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    return [report_details(path) for path in paths]
+    stamped: list[tuple[float, Path]] = []
+    for path in OUTPUT_DIR.glob("*.html"):
+        try:
+            stamped.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    stamped.sort(key=lambda item: item[0], reverse=True)
+
+    reports = []
+    for _mtime, path in stamped:
+        try:
+            reports.append(report_details(path))
+        except OSError:
+            continue
+    return reports
 
 
 def report_path(filename: str) -> Path:
@@ -299,31 +319,74 @@ def delete_run_files(filename: str) -> None:
 
 def prune_old_reports() -> None:
     ensure_data_dirs()
-    reports = sorted(
-        OUTPUT_DIR.glob("*.html"),
-        key=lambda path: path.stat().st_mtime,
-        reverse=True,
-    )
-    for stale_report in reports[REPORT_RETENTION_COUNT:]:
+    stamped: list[tuple[float, Path]] = []
+    for path in OUTPUT_DIR.glob("*.html"):
+        try:
+            stamped.append((path.stat().st_mtime, path))
+        except OSError:
+            continue
+    stamped.sort(key=lambda item: item[0], reverse=True)
+    for _mtime, stale_report in stamped[REPORT_RETENTION_COUNT:]:
         delete_run_files(stale_report.name)
 
 
-def stop_run_container(container_name: str) -> None:
+def run_command(args: list[str], timeout: int) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=timeout,
+    )
+
+
+def stop_run_container(container_name: str, timeout: int = 15) -> None:
     try:
-        subprocess.run(
-            ["docker", "rm", "--force", container_name],
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+        run_command(["docker", "rm", "--force", container_name], timeout)
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        pass
+
+
+def register_run_container(container_name: str) -> None:
+    with ACTIVE_RUN_LOCK:
+        ACTIVE_RUN_CONTAINERS.add(container_name)
+
+
+def forget_run_container(container_name: str) -> None:
+    with ACTIVE_RUN_LOCK:
+        ACTIVE_RUN_CONTAINERS.discard(container_name)
+
+
+def stop_active_run_containers() -> None:
+    """Stop simulations still running when the web worker is shutting down."""
+    with ACTIVE_RUN_LOCK:
+        names = list(ACTIVE_RUN_CONTAINERS)
+    for name in names:
+        stop_run_container(name, timeout=5)
+        forget_run_container(name)
+
+
+def discard_run_files(input_name: str | None, output_name: str | None) -> None:
+    if input_name:
+        try:
+            (INPUT_DIR / Path(input_name).name).unlink(missing_ok=True)
+        except OSError:
+            pass
+    if not output_name:
+        return
+    safe_output = Path(output_name).name
+    try:
+        (OUTPUT_DIR / safe_output).unlink(missing_ok=True)
+        metadata_path(safe_output).unlink(missing_ok=True)
+    except OSError:
         pass
 
 
 def resolve_simc_image() -> str:
-    """Return an immutable image digest when Docker has one available."""
+    """Return the RepoDigest that matches the configured image, when Docker has one."""
     try:
-        result = subprocess.run(
+        result = run_command(
             [
                 "docker",
                 "image",
@@ -332,15 +395,20 @@ def resolve_simc_image() -> str:
                 "{{json .RepoDigests}}",
                 SIMC_IMAGE,
             ],
-            capture_output=True,
-            text=True,
-            timeout=15,
+            15,
         )
         if result.returncode == 0:
             digests = json.loads(result.stdout.strip() or "[]")
-            if isinstance(digests, list) and digests:
-                return str(digests[0])
-    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, TypeError):
+            if isinstance(digests, list):
+                normalized = [str(item) for item in digests if isinstance(item, str)]
+                wanted, _tag = image_reference_parts(SIMC_IMAGE)
+                for digest in normalized:
+                    repository, _digest_tag = image_reference_parts(digest)
+                    if repository == wanted:
+                        return digest
+                if normalized:
+                    return normalized[0]
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError, ValueError, TypeError):
         pass
     return SIMC_IMAGE
 
@@ -417,8 +485,29 @@ def extract_simc_build(*sources: str) -> dict[str, str]:
     return build
 
 
+def image_reference_parts(reference: str) -> tuple[str, str]:
+    """Return a normalized repository and tag for an image reference."""
+    value = (reference or "").strip()
+    if "@" in value:
+        value = value.split("@", 1)[0]
+
+    slash = value.rfind("/")
+    colon = value.rfind(":")
+    if colon > slash:
+        repository, tag = value[:colon], value[colon + 1 :]
+    else:
+        repository, tag = value, "latest"
+
+    for prefix in ("docker.io/", "index.docker.io/", "registry-1.docker.io/"):
+        if repository.lower().startswith(prefix):
+            repository = repository[len(prefix) :]
+            break
+    return repository.lower(), tag.lower()
+
+
 def is_nightly_image(image: str) -> bool:
-    return image.strip().lower() == "simulationcraftorg/simc:latest"
+    repository, tag = image_reference_parts(image)
+    return repository == "simulationcraftorg/simc" and tag == "latest"
 
 
 def simc_update_note() -> str:
@@ -572,6 +661,11 @@ def render_error(
     )
 
 
+@app.context_processor
+def inject_app_version():
+    return {"app_version": APP_VERSION}
+
+
 @app.get("/")
 def index():
     reports = list_reports()
@@ -598,7 +692,7 @@ def health():
 
 @app.post("/run")
 def run_sim():
-    simc_text = (request.form.get("simc_text") or "").strip()
+    raw_text = request.form.get("simc_text") or ""
     report_name = request.form.get("report_name", "")
     simc_file = request.files.get("simc_file")
 
@@ -623,17 +717,22 @@ def run_sim():
         abort(400, "Max time must be between 30 and 1800 seconds.")
 
     uploaded_filename = None
-    file_text = ""
-
     if simc_file and simc_file.filename:
-        uploaded_filename = secure_filename(simc_file.filename)
-        if not allowed_file(uploaded_filename):
+        if not allowed_file(simc_file.filename):
             abort(400, "Invalid file type. Upload a .simc or .txt file.")
-        file_text = simc_file.read().decode("utf-8", errors="replace").strip()
-
-    final_text = file_text or simc_text
-    if not final_text:
-        abort(400, "Upload a profile or paste SimulationCraft profile text.")
+        uploaded_filename = secure_filename(simc_file.filename)
+        raw_profile = simc_file.read()
+        if len(raw_profile) > profile_byte_limit():
+            abort(413)
+        final_text = raw_profile.decode("utf-8", errors="replace").strip()
+        if not final_text:
+            abort(400, "The uploaded profile is empty.")
+    else:
+        if len(raw_text.encode("utf-8")) > profile_byte_limit():
+            abort(413)
+        final_text = raw_text.strip()
+        if not final_text:
+            abort(400, "Upload a profile or paste SimulationCraft profile text.")
 
     final_text = apply_web_settings(
         profile_text=final_text,
@@ -646,100 +745,124 @@ def run_sim():
     if not SIMULATION_SLOTS.acquire(blocking=False):
         abort(429, "A simulation is already running. Try again when it finishes.")
 
+    input_name = None
+    output_name = None
+    container_name = None
+    succeeded = False
     try:
-        ensure_data_dirs()
         try:
-            mount_args = data_mount_args()
-        except DataMountError as error:
+            ensure_data_dirs()
+            try:
+                mount_args = data_mount_args()
+            except DataMountError as error:
+                return render_error(
+                    503,
+                    "Docker storage is unavailable",
+                    "The runner could not share its saved data with SimulationCraft.",
+                    str(error),
+                )
+
+            input_name, output_name = build_names(report_name, uploaded_filename)
+            input_path = INPUT_DIR / input_name
+            input_path.write_text(final_text, encoding="utf-8")
+            run_id = Path(output_name).stem.rsplit("-", 1)[-1]
+            container_name = f"simc-web-run-{run_id}"
+            register_run_container(container_name)
+
+            cmd = [
+                "docker",
+                "run",
+                f"--pull={SIMC_PULL_POLICY}",
+                "--rm",
+                "--name",
+                container_name,
+            ]
+            cmd.extend(mount_args)
+            if SIMC_CPUS:
+                cmd.extend(["--cpus", SIMC_CPUS])
+            if SIMC_MEMORY:
+                cmd.extend(["--memory", SIMC_MEMORY])
+            cmd.extend(
+                [
+                    SIMC_IMAGE,
+                    f"/input/{input_name}",
+                    f"html=/output/{output_name}",
+                ]
+            )
+
+            started_at = time.monotonic()
+            try:
+                result = run_command(cmd, SIMC_TIMEOUT_SECONDS)
+            except subprocess.TimeoutExpired as error:
+                details = error.stderr or error.stdout or ""
+                return render_error(
+                    504,
+                    "Simulation timed out",
+                    f"The run exceeded the {SIMC_TIMEOUT_SECONDS}-second limit.",
+                    details,
+                )
+            except FileNotFoundError:
+                return render_error(
+                    503,
+                    "Docker is unavailable",
+                    "The web container could not start the Docker client.",
+                    "Confirm that Docker is installed and the Docker socket is mounted.",
+                )
+            except OSError as error:
+                return render_error(
+                    503,
+                    "Docker is unavailable",
+                    "The web container could not start the Docker client.",
+                    str(error),
+                )
+            duration_seconds = time.monotonic() - started_at
+
+            if result.returncode != 0:
+                return render_error(
+                    500,
+                    "Simulation failed",
+                    "SimulationCraft stopped before producing a report.",
+                    result.stderr or result.stdout or "No error output was returned.",
+                )
+
+            if not (OUTPUT_DIR / output_name).is_file():
+                return render_error(
+                    500,
+                    "Report was not created",
+                    "SimulationCraft finished without writing the expected HTML report.",
+                )
+
+            succeeded = True
+            save_run_metadata(
+                output_name=output_name,
+                input_name=input_name,
+                fight_style_key=fight_style_key,
+                iterations=iterations,
+                desired_targets=desired_targets,
+                max_time=max_time,
+                duration_seconds=duration_seconds,
+                process_output="\n".join(filter(None, (result.stdout, result.stderr))),
+            )
+            prune_old_reports()
+            return redirect(url_for("serve_report", filename=output_name))
+        except OSError as error:
+            if succeeded:
+                raise
             return render_error(
-                503,
-                "Docker storage is unavailable",
-                "The runner could not share its saved data with SimulationCraft.",
+                500,
+                "Could not store the profile",
+                "The runner could not write the profile or report files.",
                 str(error),
             )
-
-        input_name, output_name = build_names(report_name, uploaded_filename)
-        input_path = INPUT_DIR / input_name
-        input_path.write_text(final_text, encoding="utf-8")
-        run_id = Path(output_name).stem.rsplit("-", 1)[-1]
-        container_name = f"simc-web-run-{run_id}"
-
-        cmd = [
-            "docker",
-            "run",
-            f"--pull={SIMC_PULL_POLICY}",
-            "--rm",
-            "--name",
-            container_name,
-        ]
-        cmd.extend(mount_args)
-        if SIMC_CPUS:
-            cmd.extend(["--cpus", SIMC_CPUS])
-        if SIMC_MEMORY:
-            cmd.extend(["--memory", SIMC_MEMORY])
-        cmd.extend(
-            [
-                SIMC_IMAGE,
-                f"/input/{input_name}",
-                f"html=/output/{output_name}",
-            ]
-        )
-
-        started_at = time.monotonic()
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=SIMC_TIMEOUT_SECONDS,
-            )
-        except subprocess.TimeoutExpired as error:
-            stop_run_container(container_name)
-            details = error.stderr or error.stdout or ""
-            return render_error(
-                504,
-                "Simulation timed out",
-                f"The run exceeded the {SIMC_TIMEOUT_SECONDS}-second limit.",
-                details,
-            )
-        except FileNotFoundError:
-            return render_error(
-                503,
-                "Docker is unavailable",
-                "The web container could not start the Docker client.",
-                "Confirm that Docker is installed and the Docker socket is mounted.",
-            )
-        duration_seconds = time.monotonic() - started_at
+        finally:
+            if container_name and not succeeded:
+                stop_run_container(container_name)
+            if container_name:
+                forget_run_container(container_name)
+            if not succeeded:
+                discard_run_files(input_name, output_name)
     finally:
         SIMULATION_SLOTS.release()
-
-    if result.returncode != 0:
-        return render_error(
-            500,
-            "Simulation failed",
-            "SimulationCraft stopped before producing a report.",
-            result.stderr or result.stdout or "No error output was returned.",
-        )
-
-    if not (OUTPUT_DIR / output_name).is_file():
-        return render_error(
-            500,
-            "Report was not created",
-            "SimulationCraft finished without writing the expected HTML report.",
-        )
-
-    save_run_metadata(
-        output_name=output_name,
-        input_name=input_name,
-        fight_style_key=fight_style_key,
-        iterations=iterations,
-        desired_targets=desired_targets,
-        max_time=max_time,
-        duration_seconds=duration_seconds,
-        process_output="\n".join(filter(None, (result.stdout, result.stderr))),
-    )
-    prune_old_reports()
-    return redirect(url_for("serve_report", filename=output_name))
 
 
 @app.get("/reports/<path:filename>")

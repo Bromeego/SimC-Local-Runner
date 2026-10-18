@@ -67,6 +67,14 @@
       return false;
     }
 
+    if (!file.size) {
+      fileInput.value = "";
+      fileZone.classList.add("is-error");
+      fileLabel.textContent = "That profile is empty";
+      fileHint.textContent = "Choose a profile that contains SimulationCraft input.";
+      return false;
+    }
+
     if (file.size > maxBytes) {
       fileInput.value = "";
       fileZone.classList.add("is-error");
@@ -144,6 +152,19 @@
       profileText.setCustomValidity("Upload a profile or paste profile contents.");
       profileText.reportValidity();
       return;
+    }
+
+    if (!fileInput.files.length) {
+      const textBytes = typeof TextEncoder === "function"
+        ? new TextEncoder().encode(profileText.value).length
+        : profileText.value.length;
+      if (textBytes > Number(fileZone.dataset.maxBytes)) {
+        event.preventDefault();
+        const maxMb = Math.round(Number(fileZone.dataset.maxBytes) / 1024 / 1024);
+        profileText.setCustomValidity(`The maximum profile size is ${maxMb} MB.`);
+        profileText.reportValidity();
+        return;
+      }
     }
 
     runButton.disabled = true;

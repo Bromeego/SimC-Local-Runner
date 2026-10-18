@@ -36,19 +36,19 @@
 
           <div class="field-block">
             <label for="iterations">Iterations</label>
-            <input id="iterations" type="number" name="iterations" min="100" max="50000" value="10000" inputmode="numeric">
+            <input id="iterations" type="number" name="iterations" min="100" max="50000" value="10000" inputmode="numeric" required>
             <p class="field-help">Higher values are steadier but take longer.</p>
           </div>
 
           <div class="field-block" id="desired-targets-field">
             <label for="desired_targets">Desired targets</label>
-            <input id="desired_targets" type="number" name="desired_targets" min="1" max="20" value="1" inputmode="numeric">
+            <input id="desired_targets" type="number" name="desired_targets" min="1" max="20" value="1" inputmode="numeric" required>
             <p class="field-help" id="desired-targets-note">Use a fixed target count for direct comparisons.</p>
           </div>
 
           <div class="field-block" id="max-time-field">
             <label for="max_time">Max time <span>seconds</span></label>
-            <input id="max_time" type="number" name="max_time" min="30" max="1800" value="300" inputmode="numeric">
+            <input id="max_time" type="number" name="max_time" min="30" max="1800" value="300" inputmode="numeric" required>
             <p class="field-help" id="max-time-note">Controls the simulated encounter length.</p>
           </div>
         </div>
@@ -147,5 +147,5 @@
 {% endblock %}
 
 {% block scripts %}
-  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js', v=app_version) }}" defer></script>
 {% endblock %}

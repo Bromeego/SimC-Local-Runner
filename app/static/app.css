@@ -581,6 +581,7 @@ summary:focus-visible {
 }
 
 .file-block {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;

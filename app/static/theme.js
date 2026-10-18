@@ -6,8 +6,18 @@
     return document.documentElement.dataset.theme === "light" ? "light" : "dark";
   }
 
+  function updateThemeColor() {
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (!themeColor) return;
+    themeColor.setAttribute(
+      "content",
+      currentTheme() === "light" ? "#f0efec" : "#111315"
+    );
+  }
+
   function updateLabel() {
     toggle.textContent = currentTheme() === "dark" ? "Light theme" : "Dark theme";
+    updateThemeColor();
   }
 
   toggle.addEventListener("click", function () {

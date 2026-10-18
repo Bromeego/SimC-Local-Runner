@@ -127,7 +127,7 @@ to `.env` only when you want to override them.
 | `SIMC_CPUS` | unset | Optional CPU limit for each simulation |
 | `SIMC_MEMORY` | unset | Optional memory limit such as `4g` |
 | `SIMC_TIMEOUT_SECONDS` | `1800` | Maximum run time before a simulation is stopped |
-| `MAX_UPLOAD_MB` | `2` | Maximum request and profile size |
+| `MAX_UPLOAD_MB` | `2` | Maximum size of the profile that is simulated |
 | `MAX_CONCURRENT_SIMS` | `1` | Simulation jobs accepted at once |
 | `REPORT_RETENTION_COUNT` | `100` | Successful reports retained |
 | `WEB_THREADS` | `4` | Threads serving pages and long-running requests |
@@ -192,7 +192,7 @@ docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
 Remove the override to return to the published image. Release tags such as
-`v0.3.0` also publish matching container tags; set `SIMC_WEB_IMAGE` if you want
+`v0.3.1` also publish matching container tags; set `SIMC_WEB_IMAGE` if you want
 to pin one.
 
 ## Project map

@@ -5,19 +5,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#111315">
   <title>{% block title %}SimulationCraft Local{% endblock %}</title>
-  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg', v=app_version) }}" type="image/svg+xml">
   <script>
     (function () {
       try {
         const savedTheme = localStorage.getItem("simc-theme");
         const systemTheme = window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-        document.documentElement.dataset.theme = savedTheme || systemTheme;
+        const theme = savedTheme === "light" || savedTheme === "dark" ? savedTheme : systemTheme;
+        document.documentElement.dataset.theme = theme;
+        const themeColor = document.querySelector('meta[name="theme-color"]');
+        if (themeColor) {
+          themeColor.setAttribute("content", theme === "light" ? "#f0efec" : "#111315");
+        }
       } catch (_error) {
         document.documentElement.dataset.theme = "dark";
       }
     })();
   </script>
-  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css', v=app_version) }}">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -107,7 +112,7 @@
     <p>Runs on your Docker host. Profiles stay on your machine.</p>
   </footer>
 
-  <script src="{{ url_for('static', filename='theme.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='theme.js', v=app_version) }}" defer></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
