@@ -192,7 +192,7 @@ docker compose -f compose.yaml -f compose.build.yaml up -d --build
 ```
 
 Remove the override to return to the published image. Release tags such as
-`v0.3.1` also publish matching container tags; set `SIMC_WEB_IMAGE` if you want
+`v0.3.2` also publish matching container tags; set `SIMC_WEB_IMAGE` if you want
 to pin one.
 
 ## Project map

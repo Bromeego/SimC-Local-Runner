@@ -13,6 +13,15 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates use
 - Refresh the project documentation and add a project-specific `DESIGN.md` for
   consistent interface work.
 
+## [0.3.2] - 2026-10-19
+
+### Fixed
+
+- Include the Docker client in the runner image. The current Python base is
+  Debian Trixie, whose `docker.io` package no longer contains that client, so
+  a simulation stopped with "Docker storage is unavailable" before it could
+  share saved profiles with SimulationCraft.
+
 ## [0.3.1] - 2026-10-19
 
 ### Changed
@@ -105,7 +114,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates use
 - Use unique filenames and container names for every run.
 - Document the Docker socket trust boundary.
 
-[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Bromeego/SimC-Local-Runner/compare/v0.1.1...v0.2.0

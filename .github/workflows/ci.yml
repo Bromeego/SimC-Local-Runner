@@ -43,3 +43,6 @@ jobs:
 
       - name: Build web image
         run: docker build -t simc-web:test app
+
+      - name: Check the image includes the Docker client
+        run: docker run --rm --entrypoint docker simc-web:test --version

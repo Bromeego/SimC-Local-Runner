@@ -88,7 +88,11 @@ class SimcWebTests(unittest.TestCase):
         with (
             patch.object(simc_app, "HOST_INPUT_DIR", ""),
             patch.object(simc_app, "HOST_OUTPUT_DIR", ""),
-            patch.dict(os.environ, {"HOSTNAME": "controller-id"}, clear=False),
+            patch.dict(
+                os.environ,
+                {"HOSTNAME": "controller-id", "SIMC_WEB_CONTAINER": ""},
+                clear=False,
+            ),
             patch.object(simc_app.subprocess, "run", return_value=completed) as run,
         ):
             args = simc_app.data_mount_args()
@@ -107,6 +111,49 @@ class SimcWebTests(unittest.TestCase):
                 "--mount",
                 "type=volume,source=simc-output,target=/output",
             ],
+        )
+
+    def test_data_mount_args_prefers_configured_container_name(self):
+        completed = SimpleNamespace(
+            returncode=0,
+            stderr="",
+            stdout=json.dumps(
+                [
+                    {
+                        "Mounts": [
+                            {
+                                "Type": "volume",
+                                "Name": "simc-input",
+                                "Destination": "/data/input",
+                            },
+                            {
+                                "Type": "volume",
+                                "Name": "simc-output",
+                                "Destination": "/data/output",
+                            },
+                        ]
+                    }
+                ]
+            ),
+        )
+
+        with (
+            patch.object(simc_app, "HOST_INPUT_DIR", ""),
+            patch.object(simc_app, "HOST_OUTPUT_DIR", ""),
+            patch.dict(
+                os.environ,
+                {"HOSTNAME": "controller-id", "SIMC_WEB_CONTAINER": "simc-web"},
+                clear=False,
+            ),
+            patch.object(simc_app.subprocess, "run", return_value=completed) as run,
+        ):
+            simc_app.data_mount_args()
+
+        run.assert_called_once_with(
+            ["docker", "inspect", "simc-web"],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
 
     def test_data_mount_args_discovers_bind_mounts(self):
@@ -135,7 +182,11 @@ class SimcWebTests(unittest.TestCase):
         with (
             patch.object(simc_app, "HOST_INPUT_DIR", ""),
             patch.object(simc_app, "HOST_OUTPUT_DIR", ""),
-            patch.dict(os.environ, {"HOSTNAME": "controller-id"}, clear=False),
+            patch.dict(
+                os.environ,
+                {"HOSTNAME": "controller-id", "SIMC_WEB_CONTAINER": ""},
+                clear=False,
+            ),
             patch.object(simc_app.subprocess, "run", return_value=completed),
         ):
             args = simc_app.data_mount_args()
@@ -170,7 +221,7 @@ class SimcWebTests(unittest.TestCase):
         self.assertIn("SimC Nightly", page)
         self.assertIn("Version pending", page)
         self.assertIn("Docker checks for a newer nightly before every simulation.", page)
-        self.assertIn('rel="icon" href="/static/favicon.svg?v=0.3.1"', page)
+        self.assertIn('rel="icon" href="/static/favicon.svg?v=0.3.2"', page)
         self.assertNotIn("—", page)
         self.assertNotIn("–", page)
 

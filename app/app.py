@@ -36,7 +36,7 @@ def env_choice(name: str, default: str, choices: set[str]) -> str:
 
 
 app = Flask(__name__)
-APP_VERSION = "0.3.1"
+APP_VERSION = "0.3.2"
 
 INPUT_DIR = Path(os.environ.get("INPUT_DIR", "/data/input"))
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "/data/output"))

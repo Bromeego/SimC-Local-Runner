@@ -17,6 +17,7 @@ services:
       MAX_CONCURRENT_SIMS: "${MAX_CONCURRENT_SIMS:-1}"
       REPORT_RETENTION_COUNT: "${REPORT_RETENTION_COUNT:-100}"
       WEB_THREADS: "${WEB_THREADS:-4}"
+      SIMC_WEB_CONTAINER: simc-web
     volumes:
       - simc-input:/data/input
       - simc-output:/data/output

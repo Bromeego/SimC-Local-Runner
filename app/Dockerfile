@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim-trixie
 
 LABEL org.opencontainers.image.title="simc-web" \
       org.opencontainers.image.description="A lightweight self-hosted web runner for SimulationCraft" \
@@ -7,8 +7,10 @@ LABEL org.opencontainers.image.title="simc-web" \
 
 WORKDIR /app
 
+# Trixie split the client out of docker.io. That package only recommends
+# docker-cli, so installing it with --no-install-recommends leaves no docker binary.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends docker.io \
+    && apt-get install -y --no-install-recommends docker-cli \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
