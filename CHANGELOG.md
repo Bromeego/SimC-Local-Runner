@@ -8,6 +8,26 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Dates use
 
 ## [Unreleased]
 
+### Security
+
+- Refuse simulation and delete requests that come from another site, so a web
+  page open in the same browser cannot start runs or remove reports.
+- Accept only `localhost`, IP addresses, and names in the new
+  `SIMC_WEB_ALLOWED_HOSTS` setting as the request host, which blocks DNS
+  rebinding.
+- Serve reports in a sandbox with their own opaque origin, so report scripts
+  cannot call the runner.
+- Publish the web port on `127.0.0.1` by default. Homelab deployments that are
+  opened from other devices must now set `SIMC_WEB_BIND=0.0.0.0`.
+
+### Fixed
+
+- Make the launchers open and announce the port Compose actually published,
+  including a custom `SIMC_WEB_PORT`.
+- Describe the configured `MAX_CONCURRENT_SIMS` limit on the run page.
+- Keep one web thread free by capping `MAX_CONCURRENT_SIMS` at `WEB_THREADS`
+  minus one, so the page and health check stay responsive during runs.
+
 ### Changed
 
 - Refresh the project documentation and add a project-specific `DESIGN.md` for

@@ -5,7 +5,7 @@ services:
     image: "${SIMC_WEB_IMAGE:-ghcr.io/bromeego/simc-local-runner:latest}"
     container_name: simc-web
     ports:
-      - "${SIMC_WEB_PORT:-8088}:8080"
+      - "${SIMC_WEB_BIND:-127.0.0.1}:${SIMC_WEB_PORT:-8088}:8080"
     environment:
       TZ: "${TZ:-UTC}"
       SIMC_IMAGE: "${SIMC_IMAGE:-simulationcraftorg/simc:latest}"
@@ -17,6 +17,7 @@ services:
       MAX_CONCURRENT_SIMS: "${MAX_CONCURRENT_SIMS:-1}"
       REPORT_RETENTION_COUNT: "${REPORT_RETENTION_COUNT:-100}"
       WEB_THREADS: "${WEB_THREADS:-4}"
+      SIMC_WEB_ALLOWED_HOSTS: "${SIMC_WEB_ALLOWED_HOSTS:-}"
       SIMC_WEB_CONTAINER: simc-web
     volumes:
       - simc-input:/data/input

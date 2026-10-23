@@ -1,4 +1,5 @@
 import html
+import ipaddress
 import json
 import os
 import re
@@ -7,6 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 from flask import (
@@ -54,8 +56,20 @@ SIMC_CPUS = os.environ.get("SIMC_CPUS", "").strip()
 SIMC_MEMORY = os.environ.get("SIMC_MEMORY", "").strip()
 SIMC_TIMEOUT_SECONDS = env_int("SIMC_TIMEOUT_SECONDS", 1800, 30)
 MAX_UPLOAD_MB = env_int("MAX_UPLOAD_MB", 2)
-MAX_CONCURRENT_SIMS = env_int("MAX_CONCURRENT_SIMS", 1)
 REPORT_RETENTION_COUNT = env_int("REPORT_RETENTION_COUNT", 100)
+
+# Each simulation holds a Gunicorn thread until it finishes. Keep one thread
+# free so the page and health check still answer while every slot is busy.
+WEB_THREADS = env_int("WEB_THREADS", 4, 2)
+MAX_CONCURRENT_SIMS = min(env_int("MAX_CONCURRENT_SIMS", 1), WEB_THREADS - 1)
+
+# Names other than localhost and IP addresses that may reach the app. Checking
+# the Host header stops a DNS-rebinding page from reading saved reports.
+ALLOWED_HOSTS = {
+    host.strip().lower()
+    for host in os.environ.get("SIMC_WEB_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+}
 
 def profile_byte_limit() -> int:
     return MAX_UPLOAD_MB * 1024 * 1024
@@ -661,6 +675,43 @@ def render_error(
     )
 
 
+def host_allowed(host: str) -> bool:
+    try:
+        hostname = urlsplit(f"//{host}").hostname or ""
+    except ValueError:
+        return False
+    if not hostname:
+        return False
+    if "*" in ALLOWED_HOSTS or hostname in ALLOWED_HOSTS:
+        return True
+    if hostname == "localhost" or hostname.endswith(".localhost"):
+        return True
+    # DNS rebinding needs a domain name, so a literal address is always safe.
+    try:
+        ipaddress.ip_address(hostname)
+    except ValueError:
+        return False
+    return True
+
+
+def same_origin_request() -> bool:
+    """Return whether a state-changing request came from this app's own pages."""
+    origin = request.headers.get("Origin")
+    if origin:
+        # Sandboxed reports send "null", which never matches the host.
+        return urlsplit(origin).netloc.lower() == request.host.lower()
+    # "same-site" still covers other ports on localhost, so it is refused too.
+    return request.headers.get("Sec-Fetch-Site") in (None, "same-origin", "none")
+
+
+@app.before_request
+def check_request_source():
+    if not host_allowed(request.host):
+        abort(421, "This host name is not allowed. Add it to SIMC_WEB_ALLOWED_HOSTS.")
+    if request.method not in ("GET", "HEAD", "OPTIONS") and not same_origin_request():
+        abort(403, "The request came from another site, so the runner refused it.")
+
+
 @app.context_processor
 def inject_app_version():
     return {"app_version": APP_VERSION}
@@ -677,6 +728,7 @@ def index():
         retention_count=REPORT_RETENTION_COUNT,
         timeout_minutes=max(1, round(SIMC_TIMEOUT_SECONDS / 60)),
         max_upload_mb=MAX_UPLOAD_MB,
+        max_concurrent_sims=MAX_CONCURRENT_SIMS,
         deleted=request.args.get("deleted") == "1",
         simc_status=simc_status(
             str(latest_report.get("filename") or ""),
@@ -870,7 +922,14 @@ def serve_report(filename):
     report = report_path(filename)
     if not report.is_file():
         abort(404, "Report not found.")
-    return send_from_directory(OUTPUT_DIR, report.name)
+    response = send_from_directory(OUTPUT_DIR, report.name)
+    # Reports carry SimulationCraft's own scripts and any HTML a profile writes
+    # to /output. An opaque origin keeps them away from the runner's routes.
+    response.headers["Content-Security-Policy"] = (
+        "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox "
+        "allow-downloads"
+    )
+    return response
 
 
 @app.post("/reports/<path:filename>/delete")
@@ -895,7 +954,9 @@ def handle_large_upload(_error):
 def handle_http_error(error):
     titles = {
         400: "Check the profile settings",
+        403: "Request blocked",
         404: "Nothing here",
+        421: "Unknown host name",
         429: "Runner is busy",
     }
     return render_error(

@@ -120,6 +120,8 @@ to `.env` only when you want to override them.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `SIMC_WEB_PORT` | `8088` | Host port for the web app |
+| `SIMC_WEB_BIND` | `127.0.0.1` | Host address the port listens on; `0.0.0.0` allows other devices |
+| `SIMC_WEB_ALLOWED_HOSTS` | unset | Extra host names, comma-separated, that may open the app |
 | `SIMC_WEB_IMAGE` | `ghcr.io/bromeego/simc-local-runner:latest` | Web interface image used by Compose |
 | `TZ` | `UTC` | Container timezone as an IANA name |
 | `SIMC_IMAGE` | `simulationcraftorg/simc:latest` | SimulationCraft image used for runs |
@@ -128,7 +130,7 @@ to `.env` only when you want to override them.
 | `SIMC_MEMORY` | unset | Optional memory limit such as `4g` |
 | `SIMC_TIMEOUT_SECONDS` | `1800` | Maximum run time before a simulation is stopped |
 | `MAX_UPLOAD_MB` | `2` | Maximum size of the profile that is simulated |
-| `MAX_CONCURRENT_SIMS` | `1` | Simulation jobs accepted at once |
+| `MAX_CONCURRENT_SIMS` | `1` | Simulation jobs accepted at once, up to `WEB_THREADS` minus one |
 | `REPORT_RETENTION_COUNT` | `100` | Successful reports retained |
 | `WEB_THREADS` | `4` | Threads serving pages and long-running requests |
 
@@ -232,8 +234,11 @@ docker compose ps
 docker compose logs --tail=100 simc-web
 ```
 
-The desktop address is <http://localhost:8088>. For a homelab, use the server's
-hostname or LAN IP.
+The desktop address is <http://localhost:8088>, or the port set by
+`SIMC_WEB_PORT`. The port only listens on this computer by default. For a
+homelab, set `SIMC_WEB_BIND=0.0.0.0` and use the server's LAN IP. To use a host
+name such as `simc.lan`, add it to `SIMC_WEB_ALLOWED_HOSTS`; other names get a
+421 "Unknown host name" page.
 
 ### A simulation starts but no report appears
 

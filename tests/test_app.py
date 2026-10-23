@@ -1,5 +1,6 @@
 import os
 import json
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -11,7 +12,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
-APP_DIR = Path(__file__).resolve().parents[1] / "app"
+ROOT_DIR = Path(__file__).resolve().parents[1]
+APP_DIR = ROOT_DIR / "app"
 sys.path.insert(0, str(APP_DIR))
 
 import app as simc_app
@@ -625,6 +627,156 @@ class SimcWebTests(unittest.TestCase):
             simc_app.is_nightly_image("docker.io/simulationcraftorg/simc:latest")
         )
         self.assertFalse(simc_app.is_nightly_image("simulationcraftorg/simc:stable"))
+
+    def test_cross_site_posts_are_refused(self):
+        simc_app.ensure_data_dirs()
+        (simc_app.OUTPUT_DIR / "saved.html").write_text("report")
+
+        for headers in (
+            {"Origin": "https://evil.example"},
+            {"Origin": "http://localhost:3000"},
+            {"Origin": "null"},
+            {"Sec-Fetch-Site": "cross-site"},
+            {"Sec-Fetch-Site": "same-site"},
+        ):
+            with self.subTest(headers=headers):
+                with patch.object(simc_app.subprocess, "run") as run:
+                    response = self.client.post(
+                        "/run",
+                        data={"simc_text": "mage=example"},
+                        headers=headers,
+                    )
+                self.assertEqual(response.status_code, 403)
+                self.assertIn("Request blocked", response.get_data(as_text=True))
+                run.assert_not_called()
+
+                response = self.client.post(
+                    "/reports/saved.html/delete", headers=headers
+                )
+                self.assertEqual(response.status_code, 403)
+                self.assertTrue((simc_app.OUTPUT_DIR / "saved.html").exists())
+
+    def test_same_origin_posts_are_accepted(self):
+        simc_app.ensure_data_dirs()
+        for index, headers in enumerate(
+            (
+                {"Origin": "http://localhost", "Sec-Fetch-Site": "same-origin"},
+                {"Sec-Fetch-Site": "same-origin"},
+                {"Sec-Fetch-Site": "none"},
+                {},
+            )
+        ):
+            with self.subTest(headers=headers):
+                report = simc_app.OUTPUT_DIR / f"saved-{index}.html"
+                report.write_text("report")
+                response = self.client.post(
+                    f"/reports/{report.name}/delete", headers=headers
+                )
+                self.assertEqual(response.status_code, 302)
+                self.assertFalse(report.exists())
+
+    def test_host_header_must_be_local_an_address_or_allowed(self):
+        cases = {
+            "localhost:8088": 200,
+            "simc.localhost": 200,
+            "127.0.0.1:8088": 200,
+            "192.168.1.20:8088": 200,
+            "[::1]:8088": 200,
+            "rebind.example": 421,
+            "simc.lan:8088": 421,
+        }
+        for host, status in cases.items():
+            with self.subTest(host=host):
+                response = self.client.get("/health", headers={"Host": host})
+                self.assertEqual(response.status_code, status)
+
+        with patch.object(simc_app, "ALLOWED_HOSTS", {"simc.lan"}):
+            response = self.client.get("/health", headers={"Host": "simc.lan:8088"})
+        self.assertEqual(response.status_code, 200)
+
+        with patch.object(simc_app, "ALLOWED_HOSTS", {"*"}):
+            response = self.client.get("/health", headers={"Host": "rebind.example"})
+        self.assertEqual(response.status_code, 200)
+
+    def test_reports_are_served_in_a_sandbox(self):
+        simc_app.ensure_data_dirs()
+        (simc_app.OUTPUT_DIR / "saved.html").write_text("<p>report</p>")
+
+        response = self.client.get("/reports/saved.html")
+        try:
+            self.assertEqual(response.status_code, 200)
+            policy = response.headers["Content-Security-Policy"]
+            self.assertTrue(policy.startswith("sandbox "))
+            self.assertIn("allow-scripts", policy)
+            self.assertNotIn("allow-same-origin", policy)
+        finally:
+            response.close()
+
+    def test_index_describes_configured_job_limit(self):
+        with patch.object(simc_app, "MAX_CONCURRENT_SIMS", 3):
+            page = self.client.get("/").get_data(as_text=True)
+        self.assertIn("up to 3 jobs at once", page)
+        self.assertNotIn("one job at a time", page)
+
+    def test_concurrent_sims_leave_a_web_thread_free(self):
+        for threads, sims, expected in (("2", "5", "1"), ("4", "8", "3"), ("8", "2", "2")):
+            with self.subTest(threads=threads, sims=sims):
+                env = dict(os.environ, WEB_THREADS=threads, MAX_CONCURRENT_SIMS=sims)
+                result = subprocess.run(
+                    [sys.executable, "-c", "import app; print(app.MAX_CONCURRENT_SIMS)"],
+                    cwd=APP_DIR,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                )
+                self.assertEqual(result.stdout.strip(), expected)
+
+
+@unittest.skipUnless(shutil.which("sh"), "start.sh needs a POSIX shell")
+class LauncherTests(unittest.TestCase):
+    def run_launcher(self, published_port: str) -> str:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            fake_docker = bin_dir / "docker"
+            fake_docker.write_bytes(
+                b'#!/bin/sh\n'
+                b'if [ "$1 $2" = "compose port" ]; then\n'
+                b'  [ -n "$FAKE_PUBLISHED_PORT" ] && echo "$FAKE_PUBLISHED_PORT"\n'
+                b'fi\n'
+                b'exit 0\n'
+            )
+            fake_docker.chmod(0o755)
+            # Git may check the launcher out with CRLF endings on Windows.
+            script = root / "start.sh"
+            script.write_bytes(
+                (ROOT_DIR / "start.sh").read_bytes().replace(b"\r\n", b"\n")
+            )
+
+            env = dict(
+                os.environ,
+                PATH=f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+                FAKE_PUBLISHED_PORT=published_port,
+                DISPLAY="",
+            )
+            result = subprocess.run(
+                ["sh", str(script)],
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def test_start_sh_announces_the_published_port(self):
+        self.assertIn("http://localhost:8090", self.run_launcher("127.0.0.1:8090"))
+        self.assertIn("http://localhost:9000", self.run_launcher("[::]:9000"))
+
+    def test_start_sh_falls_back_to_the_default_port(self):
+        self.assertIn("http://localhost:8088", self.run_launcher(""))
 
 
 if __name__ == "__main__":

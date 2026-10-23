@@ -74,7 +74,7 @@
 
         <div class="run-actions">
           <button class="primary-button" id="run-button" type="submit">Run simulation</button>
-          <p>The runner allows one job at a time and stops it after {{ timeout_minutes }} minutes.</p>
+          <p>The runner allows {% if max_concurrent_sims == 1 %}one job at a time{% else %}up to {{ max_concurrent_sims }} jobs at once{% endif %} and stops each after {{ timeout_minutes }} minutes.</p>
         </div>
 
         <div class="run-status" id="run-status" role="status" aria-live="polite" hidden>

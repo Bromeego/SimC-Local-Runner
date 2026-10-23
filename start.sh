@@ -22,7 +22,13 @@ fi
 echo "Starting SimC Local Runner..."
 docker compose up -d --wait --wait-timeout 90
 
-APP_URL="http://localhost:8088"
+# Ask Compose for the published port so a custom SIMC_WEB_PORT is respected.
+PUBLISHED=$(docker compose port simc-web 8080 2>/dev/null | head -n 1 || true)
+APP_PORT=${PUBLISHED##*:}
+case "$APP_PORT" in
+    ''|*[!0-9]*) APP_PORT=8088 ;;
+esac
+APP_URL="http://localhost:$APP_PORT"
 echo ""
 echo "SimC Local Runner is starting at $APP_URL"
 

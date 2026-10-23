@@ -95,7 +95,13 @@ Add or uncomment:
 ```dotenv
 COMPOSE_FILE=compose.yaml:compose.bind.yaml
 SIMC_WEB_ROOT=/srv/simc-web
+SIMC_WEB_BIND=0.0.0.0
 ```
+
+`SIMC_WEB_BIND=0.0.0.0` lets other devices reach the port, which otherwise
+listens only on the server itself. If you open the runner by host name rather
+than IP address, list that name too, for example
+`SIMC_WEB_ALLOWED_HOSTS=simc.lan`.
 
 `SIMC_WEB_ROOT` must be an absolute path containing the `input/` and `output/`
 folders.
@@ -160,7 +166,9 @@ docker compose logs --tail=100 simc-web
 ```
 
 The desktop address is <http://localhost:8088>. On a homelab, use the server's
-hostname or LAN IP rather than `localhost`.
+LAN IP rather than `localhost`, and confirm `.env` sets `SIMC_WEB_BIND=0.0.0.0`.
+A 421 "Unknown host name" page means the name in the address bar needs to be
+added to `SIMC_WEB_ALLOWED_HOSTS`.
 
 If another service already uses port `8088`, set a different host port in
 `.env`:
