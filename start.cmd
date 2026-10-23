@@ -24,9 +24,20 @@ echo Starting SimC Local Runner...
 docker compose up -d --wait --wait-timeout 90
 if errorlevel 1 goto failed
 
+rem Ask Compose for the published port so a custom SIMC_WEB_PORT is respected.
+set "APP_PORT="
+for /f "delims=" %%p in ('docker compose port simc-web 8080 2^>nul') do if not defined APP_PORT set "APP_PORT=%%p"
+if not defined APP_PORT set "APP_PORT=8088"
+:strip_host
+if not "%APP_PORT::=%"=="%APP_PORT%" (
+    set "APP_PORT=%APP_PORT:*:=%"
+    goto strip_host
+)
+set "APP_URL=http://localhost:%APP_PORT%"
+
 echo.
-echo SimC Local Runner is starting at http://localhost:8088
-start "" "http://localhost:8088"
+echo SimC Local Runner is starting at %APP_URL%
+start "" "%APP_URL%"
 exit /b 0
 
 :failed
